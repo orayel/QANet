@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import init
 
-from fvcore.nn.weight_init import c2_msra_fill
 from detectron2.utils.registry import Registry
 
 FEATURES_MERGING_REGISTRY = Registry("FEATURES_MERGING")
@@ -184,7 +184,16 @@ class FeaturesMergingModule(nn.Module):
     def init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                c2_msra_fill(m)
+                init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    init.constant_(m.bias, val=0.0)
+            elif isinstance(m, nn.BatchNorm2d):
+                init.constant_(m.weight, val=1.0)
+                init.constant_(m.bias, val=0.0)
+            elif isinstance(m, nn.Linear):
+                init.xavier_normal_(m.weight)
+                if m.bias is not None:
+                    init.constant_(m.bias, val=0.0)
 
     def forward(self, features):
         size = features[0].shape[2:]
