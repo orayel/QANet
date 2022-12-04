@@ -26,7 +26,7 @@ class ASPPPooling(nn.Sequential):
     def __init__(self, in_channels, out_channels):
         super(ASPPPooling, self).__init__(
             nn.AdaptiveAvgPool2d(1),
-            nn.Conv2d(in_channels, out_channels, 1, bias=False),
+            nn.Conv2d(in_channels, out_channels, 1, bias=True),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True))
 
@@ -63,7 +63,6 @@ class ASPP(nn.Module):
             nn.Dropout(0.1),)
 
     def forward(self, x):
-        # TODO : some wrong
         res = []
         for conv in self.convs:
             res.append(conv(x))

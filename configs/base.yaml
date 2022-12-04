@@ -39,4 +39,4 @@ TEST:
 DATALOADER:
   NUM_WORKERS: 0
 VERSION: 2
-OUTPUT_DIR: 'output'
+OUTPUT_DIR: '../output'
