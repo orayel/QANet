@@ -2,8 +2,8 @@ import os
 from detectron2.data.datasets.coco import load_coco_json
 from detectron2.data import MetadataCatalog, DatasetCatalog
 
-COD10K_ROOT = 'datasets/COD10K'
-NC4K_ROOT = 'datasets/NC4K'
+COD10K_ROOT = '../datasets/COD10K'
+NC4K_ROOT = '../datasets/NC4K'
 
 COD10K_TRAIN_PATH = os.path.join(COD10K_ROOT, 'train')
 COD10K_TRAIN_JSON = os.path.join(COD10K_ROOT, 'annotations/train.json')

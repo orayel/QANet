@@ -16,8 +16,8 @@ from detectron2.data import build_detection_test_loader
 from detectron2.evaluation import COCOEvaluator, print_csv_format
 
 sys.path.append(".")
-from procis import build_sparse_inst_encoder, build_sparse_inst_decoder, add_sparse_inst_config
-from procis import COCOMaskEvaluator
+from qanet import build_sparse_inst_encoder, build_sparse_inst_decoder, add_sparse_inst_config
+from qanet import COCOMaskEvaluator
 
 
 device = torch.device('cuda:0')

@@ -23,8 +23,8 @@ from detectron2.evaluation import (
 )
 
 sys.path.append(".")
-from procis import add_procis_config, COCOMaskEvaluator
-from procis.cis_datasets import register_dataset
+from qanet import add_procis_config, COCOMaskEvaluator
+from qanet.cis_datasets import register_dataset
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -139,7 +139,7 @@ class Trainer(DefaultTrainer):
     @classmethod
     def build_train_loader(cls, cfg):
         if cfg.MODEL.SPARSE_INST.DATASET_MAPPER == "ProcisInstDatasetMapper":
-            from procis import ProcisInstDatasetMapper
+            from qanet import ProcisInstDatasetMapper
             mapper = ProcisInstDatasetMapper(cfg, is_train=True)
         else:
             mapper = None
@@ -157,7 +157,7 @@ def setup(args):
     cfg.freeze()
     default_setup(cfg, args)
 
-    setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="procis")
+    setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="qanet")
     return cfg
 
 
