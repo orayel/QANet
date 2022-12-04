@@ -11,7 +11,7 @@ POSITION_EMBEDING_REGISTRY.__doc__ = "registry for position embeding"
 class PositionEmbeding(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        self.is_pos_ebd = cfg.MODEL.QANET.POSITION_EMBEDING.IS_SUING
+        self.is_pos_ebd = cfg.MODEL.QANET.POSITION_EMBEDING.IS_USING
 
     @torch.no_grad()
     def compute_coordinates_linspace(self, x):

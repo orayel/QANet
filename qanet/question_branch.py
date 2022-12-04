@@ -14,7 +14,7 @@ class QuestionBranch(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
-        in_channels = channels+2 if cfg.MODEL.QANET.POSITION_EMBEDING.IS_SUING else channels  # +2 position information
+        in_channels = channels+2 if cfg.MODEL.QANET.POSITION_EMBEDING.IS_USING else channels  # +2 position information
         hidden_dim = cfg.MODEL.DECODER.HIDDEN_DIM
         num_masks = cfg.MODEL.DECODER.NUM_MASKS
         self.num_groups = cfg.MODEL.DECODER.GROUPS
