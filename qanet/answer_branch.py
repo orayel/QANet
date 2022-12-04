@@ -124,7 +124,7 @@ class AnswerBranch(nn.Module):
 
         mask_features = self.mask_branch(features)
         edge_features = self.edge_branch(features)
-        obj_features = self.obj_branch(mask_prey, edge_prey)
+        obj_features = self.obj_branch(mask_features, edge_features)
         epr_features = self.epr_branch(features)
 
         return mask_features, edge_features, obj_features, epr_features

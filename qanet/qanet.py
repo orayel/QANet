@@ -8,7 +8,7 @@ from detectron2.modeling import META_ARCH_REGISTRY, build_backbone
 from .features_enhance import build_features_enhance
 from .features_merging import build_features_merging
 from .position_embeding import build_position_embeding
-from .answer_branch import build_preys_generate, build_epr_preys_generate
+from .answer_branch import build_answer_branch
 from .question_branch import build_question_branch
 from .chansing_process import build_chasing_process
 from .eprs_detector import build_eprs_detector
@@ -43,11 +43,10 @@ class QANet(nn.Module):
         self.pe = build_position_embeding(cfg)
         # question branch
         self.qb = build_question_branch(cfg)
+        # answer branch
+        self.ab = build_answer_branch(cfg)
 
-        # error-prone region preys generate module
-        self.epr_pgm = build_epr_preys_generate(cfg)
-        # mask and edge prey generate module
-        self.pgm = build_preys_generate(cfg)
+
         # chasing process module
         self.cpm = build_chasing_process(cfg)
         # error-prone region detector module
@@ -110,8 +109,10 @@ class QANet(nn.Module):
         features = self.fem(features)
         features = self.fmm(features)
         features = self.pe(features)
-        lsf = self.qb(features)  # location sensitive features
-
+        # location sensitive features
+        lsf = self.qb(features)
+        # mask features, edge features, object features, error-prone region features
+        mf, ef, of, eprf = self.ab(features)
 
         epr_preys = self.epr_pgm(features)
         mask_prey, edge_prey, obj_prey = self.pgm(features)
