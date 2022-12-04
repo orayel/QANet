@@ -13,7 +13,7 @@ HAUNTER_GENERATE_REGISTRY.__doc__ = "registry for haunter generate module"
 class HaunterGenerateModule(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        channels = cfg.MODEL.FEATURES_ENHANCE.NUM_CHANNELS
+        channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
         hidden_dim = cfg.MODEL.DECODER.HIDDEN_DIM
         num_masks = cfg.MODEL.DECODER.NUM_MASKS
         self.num_groups = cfg.MODEL.DECODER.GROUPS

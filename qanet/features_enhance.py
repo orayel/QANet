@@ -63,6 +63,7 @@ class ASPP(nn.Module):
             nn.Dropout(0.1),)
 
     def forward(self, x):
+        # TODO : some wrong
         res = []
         for conv in self.convs:
             res.append(conv(x))
@@ -112,9 +113,9 @@ class FeaturesEnhanceModule(nn.Module):
     def __init__(self, cfg, input_shape):
         super().__init__()
 
-        self.in_features = cfg.MODEL.FEATURES_ENHANCE.IN_FEATURES
-        self.num_channels = cfg.MODEL.FEATURES_ENHANCE.NUM_CHANNELS
-        self.rfe_name = cfg.MODEL.FEATURES_ENHANCE.RFENAME
+        self.in_features = cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES
+        self.num_channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
+        self.rfe_name = cfg.MODEL.QANET.FEATURES_ENHANCE.RFENAME
         self.in_channels = [input_shape[f].channels for f in self.in_features]
 
         fpn_laterals = []

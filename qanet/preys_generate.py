@@ -105,7 +105,7 @@ class ObjPreyBranch(nn.Module):
 class PreysGenerateModule(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        channels = cfg.MODEL.FEATURES_ENHANCE.NUM_CHANNELS + 2  # position information cost 2 channels
+        channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS + 2  # position information cost 2 channels
 
         self.mask_prey_branch = PreyBranch(cfg, channels)
         self.edge_prey_branch = PreyBranch(cfg, channels)
@@ -156,9 +156,9 @@ class PreysGenerateModule(nn.Module):
 class EprPreysGenerateModule(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        channels = cfg.MODEL.FEATURES_ENHANCE.NUM_CHANNELS + 2  # position information cost 2 channels
+        channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS + 2  # position information cost 2 channels
 
-        nums_features = len(cfg.MODEL.FEATURES_ENHANCE.IN_FEATURES)
+        nums_features = len(cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES)
         epr_prey_branchs = [PreyBranch(cfg, channels) for _ in range(nums_features)]
         self.epr_prey_branchs = nn.ModuleList(epr_prey_branchs)
 

@@ -12,14 +12,14 @@ def add_qanet_config(cfg):
     cfg.MODEL.QANET = CN()
 
     # [Features Enhance Module]
-    cfg.MODEL.FEATURES_ENHANCE = CN()
-    cfg.MODEL.FEATURES_ENHANCE.RFENAME = "ASPP"
-    cfg.MODEL.FEATURES_ENHANCE.IN_FEATURES = ["res3", "res4", "res5"]
-    cfg.MODEL.FEATURES_ENHANCE.NUM_CHANNELS = 256
+    cfg.MODEL.QANET.FEATURES_ENHANCE = CN()
+    cfg.MODEL.QANET.FEATURES_ENHANCE.RFENAME = "ASPP"
+    cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES = ["res3", "res4", "res5"]
+    cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS = 256
 
     # [Features Merging Module]
-    cfg.MODEL.FEATURES_MERGING = CN()
-    cfg.MODEL.FEATURES_MERGING.IS_USING_HAM = True
+    cfg.MODEL.QANET.FEATURES_MERGING = CN()
+    cfg.MODEL.QANET.FEATURES_MERGING.IS_USING_HAM = True
 
     # [Decoder]
     cfg.MODEL.DECODER = CN()
@@ -72,13 +72,19 @@ def add_qanet_config(cfg):
     # [INPUT]
     cfg.INPUT.MIN_SIZE_TRAIN = (640, 672, 704, 736, 768, 800)
     cfg.INPUT.MIN_SIZE_TEST = 800
-    cfg.INPUT.RANDOM_FLIP = True
+    cfg.INPUT.RANDOM_FLIP = "vertical"
     cfg.INPUT.FORMAT = "RGB"
     cfg.INPUT.MASK_FORMAT = "bitmask"
 
+    # [RESNET]
+    cfg.MODEL.RESNETS.DEPTH = 50
+    cfg.MODEL.RESNETS.OUT_FEATURES = ["res3", "res4", "res5"]
+    cfg.MODEL.RESNETS.NORM = 'BN'
+    cfg.MODEL.RESNETS.DEFORM_ON_PER_STAGE = [False, False, True, True]
+
     # [Pyramid Vision Transformer]
     cfg.MODEL.PVTV2 = CN()
-    cfg.MODEL.PVTV2.OUT_FEATURES = ["res2", "res3", "res4", "res5"]
+    cfg.MODEL.PVTV2.OUT_FEATURES = ["res3", "res4", "res5"]
 
     # [SWIN]
     cfg.MODEL.SWIN = CN()
@@ -96,7 +102,7 @@ def add_qanet_config(cfg):
     cfg.MODEL.SWIN.DROP_PATH_RATE = 0.3
     cfg.MODEL.SWIN.APE = False
     cfg.MODEL.SWIN.PATCH_NORM = True
-    cfg.MODEL.SWIN.OUT_FEATURES = ["res2", "res3", "res4", "res5"]
+    cfg.MODEL.SWIN.OUT_FEATURES = ["res3", "res4", "res5"]
     cfg.MODEL.SWIN.USE_CHECKPOINT = False
 
     # [OUTPUT]

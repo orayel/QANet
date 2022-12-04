@@ -168,8 +168,8 @@ class Hamburger(nn.Module):
 class FeaturesMergingModule(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        self.num_channels = cfg.MODEL.FEATURES_ENHANCE.NUM_CHANNELS
-        self.is_using_ham = cfg.MODEL.FEATURES_MERGING.IS_USING_HAM
+        self.num_channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
+        self.is_using_ham = cfg.MODEL.QANET.FEATURES_MERGING.IS_USING_HAM
 
         self.fusion = nn.Conv2d(self.num_channels * 3, self.num_channels, 1)
 
