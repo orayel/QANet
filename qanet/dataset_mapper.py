@@ -1,18 +1,13 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
 import copy
 import logging
 import numpy as np
 import torch
 
-
 from detectron2.data import detection_utils as utils
 from detectron2.data import transforms as T
 
-"""
-This file contains the default mapping that's applied to "dataset dicts".
-"""
 
-__all__ = ["ProcisInstDatasetMapper"]
+__all__ = ["QANetInstDatasetMapper"]
 
 
 def build_transform_gen(cfg, is_train):
@@ -41,16 +36,13 @@ def build_transform_gen(cfg, is_train):
             )
         )
     if is_train:
-        # 800,1333, 0.6
-        # 600, 1000
-        # aspect ratio fixed
         augmentation.append(
             T.ResizeShortestEdge(min_size, max_size, sample_style)
         )
     return augmentation
 
 
-class ProcisInstDatasetMapper:
+class QANetInstDatasetMapper:
     """
     A callable which takes a dataset dict in Detectron2 Dataset format,
     and map it into a format used by the model.

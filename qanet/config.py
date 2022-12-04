@@ -1,15 +1,15 @@
 from detectron2.config import CfgNode as CN
 
 
-def add_procis_config(cfg):
+def add_qanet_config(cfg):
 
     cfg.MODEL.DEVICE = 'cuda'
     cfg.MODEL.MASK_ON = True
     cfg.MODEL.PIXEL_MEAN = [123.675, 116.280, 103.530]
     cfg.MODEL.PIXEL_STD = [58.395, 57.120, 57.375]
 
-    # [PROCIS]
-    cfg.MODEL.SPARSE_INST = CN()
+    # [QANET]
+    cfg.MODEL.QANET = CN()
 
     # [Features Enhance Module]
     cfg.MODEL.FEATURES_ENHANCE = CN()
@@ -45,8 +45,8 @@ def add_procis_config(cfg):
 
     # [CRITERION]
     cfg.MODEL.CRITERION = CN()
-    cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj", "eprs")
-    # cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj")
+    # cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj", "eprs")
+    cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj")
     cfg.MODEL.CRITERION.LOSS_MASKS_DICE_WEIGHT = 1.0
     cfg.MODEL.CRITERION.LOSS_MASKS_BCE_WEIGHT = 1.0
     cfg.MODEL.CRITERION.LOSS_EDGES_DICE_WEIGHT = 1.0
@@ -63,10 +63,18 @@ def add_procis_config(cfg):
     # [Optimizer]
     cfg.SOLVER.OPTIMIZER = "ADAMW"
     cfg.SOLVER.BACKBONE_MULTIPLIER = 1.0
+    cfg.SOLVER.MOMENTUM = 0.9
     cfg.SOLVER.AMSGRAD = False
 
-    # [Dataset mapper]
-    cfg.MODEL.SPARSE_INST.DATASET_MAPPER = "ProcisInstDatasetMapper"
+    # [Dataset Mapper]
+    cfg.MODEL.QANET.DATASET_MAPPER = "QANetInstDatasetMapper"
+
+    # [INPUT]
+    cfg.INPUT.MIN_SIZE_TRAIN = (640, 672, 704, 736, 768, 800)
+    cfg.INPUT.MIN_SIZE_TEST = 800
+    cfg.INPUT.RANDOM_FLIP = True
+    cfg.INPUT.FORMAT = "RGB"
+    cfg.INPUT.MASK_FORMAT = "bitmask"
 
     # [Pyramid Vision Transformer]
     cfg.MODEL.PVTV2 = CN()
@@ -91,3 +99,5 @@ def add_procis_config(cfg):
     cfg.MODEL.SWIN.OUT_FEATURES = ["res2", "res3", "res4", "res5"]
     cfg.MODEL.SWIN.USE_CHECKPOINT = False
 
+    # [OUTPUT]
+    cfg.OUTPUT_DIR = 'output'

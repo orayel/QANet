@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from fvcore.nn.weight_init import c2_msra_fill
-
 from detectron2.utils.registry import Registry
 from detectron2.layers import Conv2d
 

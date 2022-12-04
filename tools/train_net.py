@@ -8,7 +8,7 @@ import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
 from detectron2.utils.logger import setup_logger
-from detectron2.data import MetadataCatalog, build_detection_train_loader, DatasetMapper
+from detectron2.data import MetadataCatalog, build_detection_train_loader
 from detectron2.engine import DefaultTrainer, default_argument_parser, default_setup, launch
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.evaluation import (
@@ -23,8 +23,7 @@ from detectron2.evaluation import (
 )
 
 sys.path.append(".")
-from qanet import add_procis_config, COCOMaskEvaluator
-from qanet.cis_datasets import register_dataset
+from qanet import add_qanet_config, COCOMaskEvaluator, register_dataset
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -138,9 +137,9 @@ class Trainer(DefaultTrainer):
 
     @classmethod
     def build_train_loader(cls, cfg):
-        if cfg.MODEL.SPARSE_INST.DATASET_MAPPER == "ProcisInstDatasetMapper":
-            from qanet import ProcisInstDatasetMapper
-            mapper = ProcisInstDatasetMapper(cfg, is_train=True)
+        if cfg.MODEL.QANET.DATASET_MAPPER == "QANetInstDatasetMapper":
+            from qanet import QANetInstDatasetMapper
+            mapper = QANetInstDatasetMapper(cfg, is_train=True)
         else:
             mapper = None
         return build_detection_train_loader(cfg, mapper=mapper)
@@ -151,7 +150,7 @@ def setup(args):
     Create configs and perform basic setups.
     """
     cfg = get_cfg()
-    add_procis_config(cfg)
+    add_qanet_config(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     cfg.freeze()

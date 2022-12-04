@@ -14,7 +14,7 @@ from .eprs_detector import build_eprs_detector
 from .criterion import build_criterion
 from .utils import nested_tensor_from_tensor_list
 
-__all__ = ["Procis"]
+__all__ = ["QANet"]
 
 
 def rescoring_mask(scores, masks, threshold):
@@ -23,7 +23,7 @@ def rescoring_mask(scores, masks, threshold):
 
 
 @META_ARCH_REGISTRY.register()
-class Procis(nn.Module):
+class QANet(nn.Module):
 
     def __init__(self, cfg):
         super().__init__()
