@@ -7,8 +7,9 @@ from detectron2.modeling import META_ARCH_REGISTRY, build_backbone
 
 from .features_enhance import build_features_enhance
 from .features_merging import build_features_merging
+from .position_embeding import build_position_embeding
 from .preys_generate import build_preys_generate, build_epr_preys_generate
-from .haunter_generate import build_haunter_generate
+from .question_branch import build_question_branch
 from .chansing_process import build_chasing_process
 from .eprs_detector import build_eprs_detector
 from .criterion import build_criterion
@@ -38,12 +39,15 @@ class QANet(nn.Module):
         self.fem = build_features_enhance(cfg, output_shape)
         # features merging module
         self.fmm = build_features_merging(cfg)
+        # position embeding
+        self.pe = build_position_embeding(cfg)
+        # question branch
+        self.qb = build_question_branch(cfg)
+
         # error-prone region preys generate module
         self.epr_pgm = build_epr_preys_generate(cfg)
         # mask and edge prey generate module
         self.pgm = build_preys_generate(cfg)
-        # haunter generate module
-        self.hgm = build_haunter_generate(cfg)
         # chasing process module
         self.cpm = build_chasing_process(cfg)
         # error-prone region detector module
@@ -104,10 +108,14 @@ class QANet(nn.Module):
         # forward
         features = self.backbone(images.tensor)
         features = self.fem(features)
-        feature4inst = self.fmm(features)
+        features = self.fmm(features)
+        features = self.pe(features)
+        lsf = self.qb(features)  # location sensitive features
+
+
         epr_preys = self.epr_pgm(features)
-        mask_prey, edge_prey, obj_prey = self.pgm(feature4inst)
-        haunter = self.hgm(feature4inst)
+        mask_prey, edge_prey, obj_prey = self.pgm(features)
+        haunter = self.hgm(features)
         output = self.cpm(haunter, epr_preys, mask_prey, edge_prey, obj_prey)
 
         if self.training:
