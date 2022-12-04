@@ -15,9 +15,9 @@ class QuestionBranch(nn.Module):
         super().__init__()
         channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
         in_channels = channels+2 if cfg.MODEL.QANET.POSITION_EMBEDING.IS_USING else channels  # +2 position information
-        hidden_dim = cfg.MODEL.DECODER.HIDDEN_DIM
-        num_masks = cfg.MODEL.DECODER.NUM_MASKS
-        self.num_groups = cfg.MODEL.DECODER.GROUPS
+        hidden_dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
+        num_masks = cfg.MODEL.QANET.QA_BRANCH.NUM_MASKS
+        self.num_groups = cfg.MODEL.QANET.QA_BRANCH.GROUPS
 
         self.init_conv = nn.Conv2d(in_channels, channels, 3)
         expand_dim = channels * self.num_groups

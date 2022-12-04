@@ -8,7 +8,7 @@ from detectron2.modeling import META_ARCH_REGISTRY, build_backbone
 from .features_enhance import build_features_enhance
 from .features_merging import build_features_merging
 from .position_embeding import build_position_embeding
-from .preys_generate import build_preys_generate, build_epr_preys_generate
+from .answer_branch import build_preys_generate, build_epr_preys_generate
 from .question_branch import build_question_branch
 from .chansing_process import build_chasing_process
 from .eprs_detector import build_eprs_detector

@@ -17,11 +17,11 @@ MODEL:
       IS_USING_HAM: True
     POSITION_EMBEDING:
       IS_USING: True
-  DECODER:
-    HIDDEN_DIM: 128
-    NUM_MASKS: 100
-    GROUPS: 4
-    SCALE_FACTOR: 2
+    QA_BRANCH:
+      HIDDEN_DIM: 128
+      NUM_MASKS: 100
+      GROUPS: 4
+      SCALE_FACTOR: 2
 DATASETS:
   TRAIN: ("cod10k_train",)
   TEST:  ("cod10k_test", "nc4k_test")

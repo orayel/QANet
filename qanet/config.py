@@ -21,16 +21,16 @@ def add_qanet_config(cfg):
     cfg.MODEL.QANET.FEATURES_MERGING = CN()
     cfg.MODEL.QANET.FEATURES_MERGING.IS_USING_HAM = True
 
-    # [Position embeding]
+    # [Position Embeding]
     cfg.MODEL.QANET.POSITION_EMBEDING = CN()
     cfg.MODEL.QANET.POSITION_EMBEDING.IS_SUING = True
 
-    # [Decoder]
-    cfg.MODEL.DECODER = CN()
-    cfg.MODEL.DECODER.HIDDEN_DIM = 128
-    cfg.MODEL.DECODER.NUM_MASKS = 100
-    cfg.MODEL.DECODER.GROUPS = 4
-    cfg.MODEL.DECODER.SCALE_FACTOR = 2
+    # [Question and Answer Branch]
+    cfg.MODEL.QANET.QA_BRANCH = CN()
+    cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM = 128
+    cfg.MODEL.QANET.QA_BRANCH.NUM_MASKS = 100
+    cfg.MODEL.QANET.QA_BRANCH.GROUPS = 4
+    cfg.MODEL.QANET.QA_BRANCH.SCALE_FACTOR = 2
 
     # [EprDetector]
     cfg.MODEL.EPRDETECTOR = CN()

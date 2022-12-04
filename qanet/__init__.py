@@ -1,10 +1,10 @@
 from .qanet import QANet
 from .config import add_qanet_config
 from .cis_datasets import register_dataset
-from .position_embeding import build_position_embeding
 from .features_enhance import build_features_enhance
 from .features_merging import build_features_merging
-from .preys_generate import build_preys_generate, build_epr_preys_generate
+from .position_embeding import build_position_embeding
+from .answer_branch import build_answer_branch
 from .question_branch import build_question_branch
 from .eprs_detector import build_eprs_detector, pos_embed
 from .criterion import build_criterion
