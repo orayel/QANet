@@ -10,7 +10,7 @@ from .features_merging import build_features_merging
 from .position_embeding import build_position_embeding
 from .answer_branch import build_answer_branch
 from .question_branch import build_question_branch
-from .chansing_process import build_chasing_process
+from .question2answer import build_question2answer
 from .eprs_detector import build_eprs_detector
 from .criterion import build_criterion
 from .utils import nested_tensor_from_tensor_list
@@ -45,10 +45,9 @@ class QANet(nn.Module):
         self.qb = build_question_branch(cfg)
         # answer branch
         self.ab = build_answer_branch(cfg)
+        # question to answer
+        self.q2a = build_question2answer(cfg)
 
-
-        # chasing process module
-        self.cpm = build_chasing_process(cfg)
         # error-prone region detector module
         self.epr_dm = build_eprs_detector(cfg)
         # criterion
@@ -113,11 +112,7 @@ class QANet(nn.Module):
         lsf = self.qb(features)
         # mask features, edge features, object features, error-prone region features
         mf, ef, of, eprf = self.ab(features)
-
-        epr_preys = self.epr_pgm(features)
-        mask_prey, edge_prey, obj_prey = self.pgm(features)
-        haunter = self.hgm(features)
-        output = self.cpm(haunter, epr_preys, mask_prey, edge_prey, obj_prey)
+        output = self.q2a(lsf, mf, ef, of, eprf)
 
         if self.training:
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]

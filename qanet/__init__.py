@@ -6,6 +6,7 @@ from .features_merging import build_features_merging
 from .position_embeding import build_position_embeding
 from .answer_branch import build_answer_branch
 from .question_branch import build_question_branch
+from .question2answer import build_question2answer
 from .eprs_detector import build_eprs_detector, pos_embed
 from .criterion import build_criterion
 from .dataset_mapper import QANetInstDatasetMapper
