@@ -137,8 +137,8 @@ class QANet(nn.Module):
 
         pred_scores = output["pred_logits"].sigmoid()
         pred_masks = output["pred_masks"].sigmoid()
-        pred_objectness = output["pred_scores"].sigmoid()
-        pred_scores = torch.sqrt(pred_scores * pred_objectness)
+        pred_object = output["pred_scores"].sigmoid()
+        pred_scores = torch.sqrt(pred_scores * pred_object)
         pred_masks = F.interpolate(
             pred_masks, scale_factor=4.0, mode="bilinear", align_corners=False)
         return pred_scores, pred_masks
