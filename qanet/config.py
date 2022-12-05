@@ -23,7 +23,7 @@ def add_qanet_config(cfg):
 
     # [Position Embeding]
     cfg.MODEL.QANET.POSITION_EMBEDING = CN()
-    cfg.MODEL.QANET.POSITION_EMBEDING.IS_SUING = True
+    cfg.MODEL.QANET.POSITION_EMBEDING.IS_USING = True
 
     # [Question and Answer Branch]
     cfg.MODEL.QANET.QA_BRANCH = CN()

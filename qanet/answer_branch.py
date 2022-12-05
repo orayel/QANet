@@ -100,8 +100,6 @@ class SpatialAttention(nn.Module):
 
 
 '''SegNeXt: Rethinking Convolutional Attention Design for Semantic Segmentation'''
-
-
 class MSCA(nn.Module):
     def __init__(self, dim, mlp_ratio=4., drop_path=0., ):
         super().__init__()

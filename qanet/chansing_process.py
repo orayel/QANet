@@ -13,9 +13,9 @@ CHASING_PROCESS_REGISTRY.__doc__ = "registry for chasing process module"
 class ChasingProcessModule(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        self.scale_factor = cfg.MODEL.DECODER.SCALE_FACTOR
-        self.N = cfg.MODEL.DECODER.NUM_MASKS
-        self.D = cfg.MODEL.EPRDETECTOR.DIM
+        self.scale_factor = cfg.MODEL.QANET.QA_BRANCH.SCALE_FACTOR
+        self.N = cfg.MODEL.QANET.QA_BRANCH.NUM_MASKS
+        self.D = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
         self.epr_proj = nn.Conv2d(self.N, self.N*self.D, 1, groups=self.N)  # using group conv to expand dim
         c2_msra_fill(self.epr_proj)
 
