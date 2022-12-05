@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import init
 
 from detectron2.utils.registry import Registry
 
@@ -16,6 +17,8 @@ class Question2Answer(nn.Module):
         self.N = cfg.MODEL.QANET.QA_BRANCH.NUM_MASKS
         self.D = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM * 2  # make embeding dimension bigger
         self.epr_expand = nn.Conv2d(self.N, self.N*self.D, 1)  # expand the dimension of epr
+        init.kaiming_normal_(self.epr_expand.weight, mode='fan_out', nonlinearity='relu')
+        init.constant_(self.epr_expand.bias, val=0.0)
 
     def forward(self, lsf, mf, ef, of, eprf):
         """

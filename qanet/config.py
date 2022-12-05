@@ -52,8 +52,8 @@ def add_qanet_config(cfg):
 
     # [CRITERION]
     cfg.MODEL.CRITERION = CN()
-    # cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj", "eprs")
-    cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj")
+    cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj", "eprs")
+    # cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj")
     cfg.MODEL.CRITERION.LOSS_MASKS_DICE_WEIGHT = 1.0
     cfg.MODEL.CRITERION.LOSS_MASKS_BCE_WEIGHT = 1.0
     cfg.MODEL.CRITERION.LOSS_EDGES_DICE_WEIGHT = 0.2

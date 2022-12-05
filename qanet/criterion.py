@@ -116,39 +116,37 @@ class Criterion(nn.Module):
             }
             return losses
 
-        total_loss = pred_eprs[0].sum() * 0.0  # make it in the same device
         target_masks = target_masks[mix_tgt_idx]  # change order to abs position
-        for pred_epr in pred_eprs:
-            target_masks_cur_level = F.interpolate(
-                target_masks[:, None], pred_epr.shape[-2:], mode='bilinear', align_corners=False).squeeze(1)
-            target_epr_cur_level = self.get_error_prone_region(target_masks, pred_epr.shape[-2:])
+        target_masks_cur_level = F.interpolate(
+            target_masks[:, None], pred_eprs.shape[-2:], mode='bilinear', align_corners=False).squeeze(1)
+        target_eprs = self.get_error_prone_region(target_masks, pred_eprs.shape[-2:])
 
-            src_epr = pred_epr[src_idx]
-            # add position emb to src_epr, latter transformer do not need to add position emb
-            src_epr += self.pos_embed(src_epr)
-            src_tmp, tgt_tmp = [], []
-            for src_epr_one, tgt_epr_one, tgt_mask_one in zip(src_epr, target_epr_cur_level, target_masks_cur_level):
-                src_epr_one, tgt_epr_one, tgt_mask_one = \
-                    src_epr_one.flatten(1).permute(1, 0), tgt_epr_one.flatten(0), tgt_mask_one.flatten(0)
+        src_eprs = pred_eprs[src_idx]
+        # add position emb to src_epr, latter transformer do not need to add position emb
+        src_eprs += self.pos_embed(src_eprs)
+        src_tmp, tgt_tmp = [], []
+        for src_epr_one, tgt_epr_one, tgt_mask_one in zip(src_eprs, target_eprs, target_masks_cur_level):
+            src_epr_one, tgt_epr_one, tgt_mask_one = \
+                src_epr_one.flatten(1).permute(1, 0), tgt_epr_one.flatten(0), tgt_mask_one.flatten(0)
 
-                src_tmp.append(src_epr_one[tgt_epr_one.to(torch.bool)])
-                tgt_tmp.append(tgt_mask_one[tgt_epr_one.to(torch.bool)])
+            src_tmp.append(src_epr_one[tgt_epr_one.to(torch.bool)])
+            tgt_tmp.append(tgt_mask_one[tgt_epr_one.to(torch.bool)])
 
-            # padding the lower length of epr to longest, mask==1 means where is padding
-            max_l = max([t.shape[0] for t in tgt_tmp])
-            src_seq = torch.cat([F.pad(t.unsqueeze(0), (0, 0, 0, max_l - t.shape[0])) for t in src_tmp])
-            tgt_seq = torch.cat([F.pad(t.unsqueeze(0), (0, max_l - t.shape[0])) for t in tgt_tmp])
-            padding_mask = torch.cat([1 - F.pad(torch.ones_like(t.unsqueeze(0)), (0, max_l - t.shape[0]))
-                                     for t in tgt_tmp]).to(torch.bool)
+        # padding the lower length of epr to longest, mask==1 means where is padding
+        max_l = max([t.shape[0] for t in tgt_tmp])
+        src_seq = torch.cat([F.pad(t.unsqueeze(0), (0, 0, 0, max_l - t.shape[0])) for t in src_tmp])
+        tgt_seq = torch.cat([F.pad(t.unsqueeze(0), (0, max_l - t.shape[0])) for t in tgt_tmp])
+        padding_mask = torch.cat([1 - F.pad(torch.ones_like(t.unsqueeze(0)), (0, max_l - t.shape[0]))
+                                 for t in tgt_tmp]).to(torch.bool)
 
-            pred_seq = self.eprs_detector(src_seq, padding_mask).flatten(1)
-            pred_seq[padding_mask] = 0.  # set padding value to zero, do not take part in computing loss
+        pred_seq = self.eprs_detector(src_seq, padding_mask).flatten(1)
+        pred_seq[padding_mask] = 0.  # set padding value to zero, do not take part in computing loss
 
-            total_loss += F.binary_cross_entropy_with_logits(pred_seq, tgt_seq, reduction='mean')
-            if total_loss != total_loss:
-                print('Case Nan!')
+        loss = F.binary_cross_entropy_with_logits(pred_seq, tgt_seq, reduction='mean')
+        if loss != loss:
+            print('Case Nan!')
 
-        losses = {'loss_eprs': total_loss / len(pred_eprs)}
+        losses = {'loss_eprs': loss}
         return losses
 
     def loss_edges(self, outputs, targets, idxs, num_instances, input_shape):
@@ -305,7 +303,7 @@ class Matcher(nn.Module):
                     self.dice_score(pred_masks, tgt_masks), self.dice_score(pred_edges, tgt_edges), pred_obj
                 score = (mask_score ** self.alpha) * (edge_score ** self.beta) * (obj_score ** self.gama)
 
-            score = score.view(B, N, -1).cpu()  # B N_MASK N_GTs
+            score = score.view(B, N, -1).cpu()  # B NUM_MASK NUM_GTs
             # hungarian matching
             # TODO : do it dynamic-k times to make more positive sample?
             sizes = [len(v["masks"]) for v in targets]
