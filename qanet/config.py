@@ -79,7 +79,7 @@ def add_qanet_config(cfg):
     # [INPUT]
     cfg.INPUT.MIN_SIZE_TRAIN = (640, 672, 704, 736, 768, 800)
     cfg.INPUT.MIN_SIZE_TEST = 800
-    cfg.INPUT.RANDOM_FLIP = "vertical"
+    cfg.INPUT.RANDOM_FLIP = "horizontal"
     cfg.INPUT.FORMAT = "RGB"
     cfg.INPUT.MASK_FORMAT = "bitmask"
 
