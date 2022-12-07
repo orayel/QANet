@@ -113,4 +113,4 @@ def add_qanet_config(cfg):
     cfg.MODEL.SWIN.USE_CHECKPOINT = False
 
     # [OUTPUT]
-    cfg.OUTPUT_DIR = 'output'
+    cfg.OUTPUT_DIR = '../output'
