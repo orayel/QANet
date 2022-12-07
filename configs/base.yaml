@@ -25,13 +25,6 @@ MODEL:
       DROP_RATE: 0.1
       NUM_MSCA_BLOCKS: 3
       MLP_RATIO: 4.
-    EPRDETECTOR:
-      DIM: 256
-      NUM_HEAD: 4
-      DIM_FORWARD: 1024
-      DROPOUT: 0.1
-      ACT: 'relu'
-      NUM_LAYER: 3
   MATCHER:
     ALPHA: 0.7
     BETA: 0.2

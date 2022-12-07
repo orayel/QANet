@@ -8,45 +8,6 @@ ANSWER_BRANCH_REGISTRY = Registry("ANSWER_BRANCH")
 ANSWER_BRANCH_REGISTRY.__doc__ = "registry for answer branch"
 
 
-def drop_path(x, drop_prob: float = 0., training: bool = False):
-    if drop_prob == 0. or not training:
-        return x
-    keep_prob = 1 - drop_prob
-    shape = (x.shape[0],) + (1,) * (x.ndim - 1)
-    random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
-    random_tensor.floor_()
-    output = x.div(keep_prob) * random_tensor
-    return output
-
-
-class DropPath(nn.Module):
-    def __init__(self, drop_prob=None):
-        super(DropPath, self).__init__()
-        self.drop_prob = drop_prob
-
-    def forward(self, x):
-        return drop_path(x, self.drop_prob, self.training)
-
-
-class Mlp(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None):
-        super().__init__()
-        out_features = out_features or in_features
-        hidden_features = hidden_features or in_features
-        self.fc1 = nn.Conv2d(in_features, hidden_features, 1)
-        self.dwconv = nn.Conv2d(hidden_features, hidden_features, 3, 1, 1, bias=True, groups=hidden_features)
-        self.act = nn.GELU()
-        self.fc2 = nn.Conv2d(hidden_features, out_features, 1)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.dwconv(x)
-        x = self.act(x)
-        x = self.fc2(x)
-
-        return x
-
-
 class AttentionModule(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -81,6 +42,7 @@ class AttentionModule(nn.Module):
         return attn * u
 
 
+'''SegNeXt: Rethinking Convolutional Attention Design for Semantic Segmentation'''
 class SpatialAttention(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -99,47 +61,19 @@ class SpatialAttention(nn.Module):
         return x + shortcut
 
 
-'''SegNeXt: Rethinking Convolutional Attention Design for Semantic Segmentation'''
-class MSCA(nn.Module):
-    def __init__(self, dim, mlp_ratio=4., drop_path=0., ):
+class FeaturesDecoder(nn.Module):
+    def __init__(self, cfg, channels):
         super().__init__()
-        self.norm1 = nn.BatchNorm2d(dim)
-        self.attn = SpatialAttention(dim)
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.norm2 = nn.BatchNorm2d(dim)
-        mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim)
-        layer_scale_init_value = 1e-2
-        self.layer_scale_1 = nn.Parameter(layer_scale_init_value * torch.ones((dim)), requires_grad=True)
-        self.layer_scale_2 = nn.Parameter(layer_scale_init_value * torch.ones((dim)), requires_grad=True)
+        hidden_dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
 
-    def forward(self, x):
-        x = x + self.drop_path(self.layer_scale_1.unsqueeze(-1).unsqueeze(-1) * self.attn(self.norm1(x)))
-        x = x + self.drop_path(self.layer_scale_2.unsqueeze(-1).unsqueeze(-1) * self.mlp(self.norm2(x)))
-        return x
-
-
-class MaskEdgeBranch(nn.Module):
-    def __init__(self, cfg, in_channels):
-        super().__init__()
-
-        dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
-        drop_path_rate = cfg.MODEL.QANET.QA_BRANCH.DROP_RATE
-        num_blocks = cfg.MODEL.QANET.QA_BRANCH.NUM_MSCA_BLOCKS
-        mlp_ratio = cfg.MODEL.QANET.QA_BRANCH.MLP_RATIO
-
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, num_blocks)]
-        self.blocks = nn.ModuleList(MSCA(in_channels, mlp_ratio, dpr[i]) for i in range(num_blocks))
-        self.proj = nn.Conv2d(in_channels, dim, 1)
+        self.attention = SpatialAttention(channels)
+        self.projection = nn.Conv2d(channels, hidden_dim, 1)
 
     def forward(self, features):
-        for block in self.blocks:
-            features = block(features)
-        features = self.proj(features)
-        return features
+        return self.projection(self.attention(features))
 
 
-class ObjEprBranch(nn.Module):
+class ObjBranch(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
@@ -163,16 +97,7 @@ class ObjEprBranch(nn.Module):
         obj_f = gama_exp[0] / torch.sum(gama_exp) * avg_f + gama_exp[1] / torch.sum(gama_exp) * max_f
         obj_features = self.obj_proj(obj_f.squeeze(-1).permute(0, 2, 1)).permute(0, 2, 1)
 
-        # error-prone region features
-        omega_mask_exp, omega_edge_exp = torch.exp(self.omega_mask), torch.exp(self.omega_edge)
-        mask_fuse = omega_mask_exp[0] / torch.sum(omega_mask_exp) * mask_avg_f + \
-                    omega_mask_exp[1] / torch.sum(omega_mask_exp) * mask_max_f
-        edge_fuse = omega_edge_exp[0] / torch.sum(omega_edge_exp) * edge_avg_f + \
-                    omega_edge_exp[1] / torch.sum(omega_edge_exp) * edge_max_f
-        epr_f = mask_fuse.sigmoid() * mask_features + edge_fuse.sigmoid() * edge_features
-        epr_features = self.epr_proj(epr_f)
-
-        return obj_features, epr_features
+        return obj_features
 
 
 @ANSWER_BRANCH_REGISTRY.register()
@@ -180,7 +105,7 @@ class AnswerBranch(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
-        in_channels = channels + 2 if cfg.MODEL.QANET.POSITION_EMBEDING.IS_USING else channels  # +2 position information
+        in_channels = channels + 2 if cfg.MODEL.QANET.POSITION_EMBEDING.IS_USING else channels
 
         self.init_conv = nn.Conv2d(in_channels, channels, 3)
         self.mask_branch = MaskEdgeBranch(cfg, channels)

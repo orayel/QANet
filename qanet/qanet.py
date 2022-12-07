@@ -106,6 +106,7 @@ class QANet(nn.Module):
         # forward
         features = self.backbone(images.tensor)
         features = self.fem(features)
+        features_aux = features[1:][::-1]  # 32↓  16↓  (remove 8↓)
         features = self.fmm(features)
         features = self.pe(features)
         # location sensitive features
