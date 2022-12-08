@@ -198,8 +198,6 @@ class Matcher(nn.Module):
         lower value higher score (power)
         """
         self.alpha = cfg.MODEL.MATCHER.ALPHA
-        self.beta = cfg.MODEL.MATCHER.BETA
-        self.gama = cfg.MODEL.MATCHER.GAMA
 
     @staticmethod
     def dice_score(inputs, targets):
@@ -217,6 +215,9 @@ class Matcher(nn.Module):
         score = intersection / (union + 1e-6)
         return score
 
+    def combined_score(self, inputs, targets):
+        return (self.dice_score(inputs, targets) + self.iou_score(inputs, targets)) / 2
+
     @staticmethod
     def get_edges(targets):
         targets = targets.float()
@@ -227,28 +228,46 @@ class Matcher(nn.Module):
 
     def forward(self, outputs, targets, input_shape):
         with torch.no_grad():
+
             pred_masks = outputs['pred_masks'].sigmoid()  # B N H W
             pred_edges = outputs['pred_edges'].sigmoid()  # B N H W
             pred_obj = outputs['pred_obj'].sigmoid()  # B N 1
+            pred_masks_aux = []
+            for pred_mask_aux in outputs['pred_masks_aux']:
+                pred_masks_aux.append(pred_mask_aux.sigmoid())  # B N H W
             B, N, H, W = pred_masks.shape
 
             tgt_ids = torch.cat([v["labels"] for v in targets])
             if tgt_ids.shape[0] == 0:
                 return [(torch.as_tensor([]).to(pred_masks), torch.as_tensor([]).to(pred_masks))] * B
+
             tgt_masks, _ = nested_masks_from_list([t["masks"].tensor for t in targets], input_shape).decompose()
             tgt_masks = tgt_masks.to(pred_masks)  # BitMask to float
-            tgt_masks = F.interpolate(tgt_masks[:, None], size=(H, W), mode="bilinear", align_corners=False)
-            tgt_edges = self.get_edges(tgt_masks)
+            tgt_masks_aux = []
+            for pred_mask_aux in pred_masks_aux:
+                _, _, h, w = pred_mask_aux.shape
+                tgt_masks_aux.append(
+                    F.interpolate(tgt_masks[:, None], size=(h, w),
+                                  mode="bilinear", align_corners=False).flatten(1).float())
+            tgt_masks = F.interpolate(tgt_masks[:, None], size=(H, W),
+                                      mode="bilinear", align_corners=False).flatten(1).float()
+            tgt_edges = self.get_edges(tgt_masks).flatten(1).float()
 
             pred_masks, pred_edges, pred_obj = \
-                pred_masks.view(B * N, -1), pred_edges.view(B * N, -1), pred_obj.view(B * N, -1)
-            tgt_masks, tgt_edges = tgt_masks.flatten(1), tgt_edges.flatten(1)
+                pred_masks.view(B * N, -1).float(), pred_edges.view(B * N, -1).float(), pred_obj.view(B * N, -1).float()
+            for i in range(len(pred_masks_aux)):
+                pred_masks_aux[i] = pred_masks_aux[i].view(B * N, -1).float()
+
             with autocast(enabled=False):  # fp16
-                pred_masks, pred_edges, pred_obj = pred_masks.float(), pred_edges.float(), pred_obj.float()
-                tgt_masks, tgt_edges = tgt_masks.float(), tgt_edges.float()
-                mask_score, edge_score, obj_score = \
-                    self.dice_score(pred_masks, tgt_masks), self.dice_score(pred_edges, tgt_edges), pred_obj
-                score = (mask_score ** self.alpha) * (edge_score ** self.beta) * (obj_score ** self.gama)
+
+                mask_score = self.combined_score(pred_masks, tgt_masks)
+                edge_score = self.combined_score(pred_edges, tgt_edges)
+                mask_score_aux = sum([self.combined_score(pred_mask_aux, tgt_mask_aux) for
+                                      pred_mask_aux, tgt_mask_aux in zip(pred_masks_aux, tgt_masks_aux)])
+                obj_score = pred_obj
+
+                # finally score for matching
+                score = self.alpha * (mask_score + obj_score) + (1 - self.alpha) * (edge_score + mask_score_aux)
 
             score = score.view(B, N, -1).cpu()  # B NUM_MASK NUM_GTs
             # hungarian matching

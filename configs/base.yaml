@@ -24,9 +24,7 @@ MODEL:
       INIT_CONVS: 3
       SCALE_FACTOR: 2
   MATCHER:
-    ALPHA: 0.7
-    BETA: 0.2
-    GAMA: 0.1
+    ALPHA: 0.6
   CRITERION:
     ITEMS: ("masks", "edges", "obj")
     LOSS_MASKS_DICE_WEIGHT: 1.0

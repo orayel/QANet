@@ -35,9 +35,7 @@ def add_qanet_config(cfg):
 
     # [Matcher]
     cfg.MODEL.MATCHER = CN()
-    cfg.MODEL.MATCHER.ALPHA = 0.7
-    cfg.MODEL.MATCHER.BETA = 0.2
-    cfg.MODEL.MATCHER.GAMA = 0.1
+    cfg.MODEL.MATCHER.ALPHA = 0.6
 
     # [CRITERION]
     cfg.MODEL.CRITERION = CN()
