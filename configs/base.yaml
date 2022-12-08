@@ -25,6 +25,8 @@ MODEL:
       SCALE_FACTOR: 2
   MATCHER:
     ALPHA: 0.6
+    DYNAMIC_K: True
+    START_K: 10
   CRITERION:
     ITEMS: ("masks", "edges", "obj")
     LOSS_MASKS_DICE_WEIGHT: 1.0

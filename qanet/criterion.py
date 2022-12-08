@@ -157,12 +157,43 @@ class Criterion(nn.Module):
         }
         return losses
 
+    def loss_masks_aux(self, outputs, targets, idxs, num_instances, input_shape):
+
+        src_idx, _, mix_tgt_idx = idxs
+        assert "pred_masks_aux" in outputs
+        src_masks_aux = outputs["pred_masks_aux"]
+        with torch.no_grad():
+            target_masks, _ = nested_masks_from_list(
+                [t["masks"].tensor for t in targets], input_shape).decompose()
+        target_masks = target_masks.to(src_masks_aux[0])
+        if len(target_masks) == 0:
+            losses = {
+                "loss_masks_aux_dice": src_masks_aux[0].sum() * 0.0
+            }
+            return losses
+
+        loss_masks_aux_dice_total = src_masks_aux[0].sum() * 0.0
+        for src_mask_aux in src_masks_aux:
+            src_mask_aux_tmp = src_mask_aux[src_idx]
+            target_mask_aux_tmp = F.interpolate(
+                target_masks[:, None], size=src_mask_aux_tmp.shape[-2:],
+                mode='bilinear', align_corners=False).squeeze(1)
+            src_mask_aux_tmp = src_mask_aux_tmp.flatten(1)
+            target_mask_aux_tmp = target_mask_aux_tmp[mix_tgt_idx].flatten(1)  # change order to abs position
+
+
+        losses = {
+            "loss_masks_dice": self.dice_loss(src_masks, target_masks, num_instances, reduction='mean'),
+        }
+        return losses
+
     def get_loss(self, loss, outputs, targets, indices, num_instances, **kwargs):
 
         loss_map = {
             "masks": self.loss_masks,
             "edges": self.loss_edges,
             "obj": self.loss_obj,
+            "masks_aux": self.loss_masks_aux
         }
 
         assert loss in loss_map
@@ -281,9 +312,9 @@ class Matcher(nn.Module):
             score = score.view(B, N, -1).cpu()  # B NUM_MASK NUM_GTs
             # hungarian matching
             sizes = [len(v["masks"]) for v in targets]
-            if self.dynamic_k:  # do it dynamic-k times to make more positive sample in early time
 
-                k = cnt = max(1, math.ceil(self.start_k * (1 - self.cur_iter / self.total_iter)))
+            if self.dynamic_k:  # do it dynamic-k times to make more positive sample in early time
+                cnt = k = max(1, math.ceil(self.start_k * (1 - self.cur_iter / self.total_iter)))
                 indices = [([], [])] * B
                 while cnt:
                     indices_cur = [linear_sum_assignment(s[i], maximize=True)
