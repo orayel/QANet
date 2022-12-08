@@ -11,7 +11,6 @@ from .position_embeding import build_position_embeding
 from .answer_branch import build_answer_branch
 from .question_branch import build_question_branch
 from .question2answer import build_question2answer
-from .eprs_detector import build_eprs_detector
 from .criterion import build_criterion
 from .utils import nested_tensor_from_tensor_list
 
@@ -47,11 +46,8 @@ class QANet(nn.Module):
         self.ab = build_answer_branch(cfg)
         # question to answer
         self.q2a = build_question2answer(cfg)
-
-        # error-prone region detector module
-        self.epr_dm = build_eprs_detector(cfg)
         # criterion
-        self.criterion = build_criterion(cfg, self.epr_dm)
+        self.criterion = build_criterion(cfg)
 
         # data and preprocessing
         self.mask_format = cfg.INPUT.MASK_FORMAT
@@ -108,12 +104,12 @@ class QANet(nn.Module):
         features = self.fem(features)
         features_aux = features[1:][::-1]  # 32↓  16↓  (remove 8↓)
         features = self.fmm(features)
-        features = self.pe(features)
+        features, features_aux = self.pe(features, features_aux)
         # location sensitive features
         lsf = self.qb(features)
-        # mask features, edge features, object features, error-prone region features
-        mf, ef, of, eprf = self.ab(features)
-        output = self.q2a(lsf, mf, ef, of, eprf)
+        # mask features, edge features, object features, mask features auxiliary
+        mf, ef, of, mf_auxs = self.ab(features, features_aux)
+        output = self.q2a(lsf, mf, ef, of, mf_auxs)
 
         if self.training:
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]

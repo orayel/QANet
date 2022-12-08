@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from torch.cuda.amp import autocast
 from kornia.morphology import erosion
 from scipy.optimize import linear_sum_assignment
-from .eprs_detector import pos_embed
 
 from detectron2.utils.registry import Registry
 from .utils import nested_masks_from_list, is_dist_avail_and_initialized, get_world_size
@@ -17,13 +16,11 @@ CRITERION_REGISTRY.__doc__ = "Criterion"
 
 @CRITERION_REGISTRY.register()
 class Criterion(nn.Module):
-    def __init__(self, cfg, matcher, eprs_detector):
+    def __init__(self, cfg, matcher):
         super().__init__()
         self.matcher = matcher
-        self.eprs_detector = eprs_detector
         self.losses = cfg.MODEL.CRITERION.ITEMS
         self.weight_dict = self.get_weight_dict(cfg)
-        self.pos_embed = pos_embed
 
     @staticmethod
     def get_weight_dict(cfg):
@@ -33,7 +30,6 @@ class Criterion(nn.Module):
             "loss_edges_dice": cfg.MODEL.CRITERION.LOSS_EDGES_DICE_WEIGHT,
             "loss_edges_bce": cfg.MODEL.CRITERION.LOSS_EDGES_BCE_WEIGHT,
             "loss_obj": cfg.MODEL.CRITERION.LOSS_OBJ_WEIGHT,
-            "loss_eprs": cfg.MODEL.CRITERION.LOSS_EPRS_WEIGHT
         }
 
     @staticmethod
@@ -101,54 +97,6 @@ class Criterion(nn.Module):
         losses = {'loss_obj': F.binary_cross_entropy_with_logits(pred_obj, tgt_obj, reduction='mean')}
         return losses
 
-    def loss_eprs(self, outputs, targets, idxs, num_instances, input_shape):
-
-        src_idx, _, mix_tgt_idx = idxs
-        assert "pred_eprs" in outputs
-        pred_eprs = outputs['pred_eprs']
-        with torch.no_grad():
-            target_masks, _ = nested_masks_from_list(
-                [t["masks"].tensor for t in targets], input_shape).decompose()
-        target_masks = target_masks.to(pred_eprs[0])
-        if len(target_masks) == 0:
-            losses = {
-                "loss_eprs": pred_eprs[0].sum() * 0.0,
-            }
-            return losses
-
-        target_masks = target_masks[mix_tgt_idx]  # change order to abs position
-        target_masks_cur_level = F.interpolate(
-            target_masks[:, None], pred_eprs.shape[-2:], mode='bilinear', align_corners=False).squeeze(1)
-        target_eprs = self.get_error_prone_region(target_masks, pred_eprs.shape[-2:])
-
-        src_eprs = pred_eprs[src_idx]
-        # add position emb to src_epr, latter transformer do not need to add position emb
-        src_eprs += self.pos_embed(src_eprs)
-        src_tmp, tgt_tmp = [], []
-        for src_epr_one, tgt_epr_one, tgt_mask_one in zip(src_eprs, target_eprs, target_masks_cur_level):
-            src_epr_one, tgt_epr_one, tgt_mask_one = \
-                src_epr_one.flatten(1).permute(1, 0), tgt_epr_one.flatten(0), tgt_mask_one.flatten(0)
-
-            src_tmp.append(src_epr_one[tgt_epr_one.to(torch.bool)])
-            tgt_tmp.append(tgt_mask_one[tgt_epr_one.to(torch.bool)])
-
-        # padding the lower length of epr to longest, mask==1 means where is padding
-        max_l = max([t.shape[0] for t in tgt_tmp])
-        src_seq = torch.cat([F.pad(t.unsqueeze(0), (0, 0, 0, max_l - t.shape[0])) for t in src_tmp])
-        tgt_seq = torch.cat([F.pad(t.unsqueeze(0), (0, max_l - t.shape[0])) for t in tgt_tmp])
-        padding_mask = torch.cat([1 - F.pad(torch.ones_like(t.unsqueeze(0)), (0, max_l - t.shape[0]))
-                                 for t in tgt_tmp]).to(torch.bool)
-
-        pred_seq = self.eprs_detector(src_seq, padding_mask).flatten(1)
-        pred_seq[padding_mask] = 0.  # set padding value to zero, do not take part in computing loss
-
-        loss = F.binary_cross_entropy_with_logits(pred_seq, tgt_seq, reduction='mean')
-        if loss != loss:
-            print('Case Nan!')
-
-        losses = {'loss_eprs': loss}
-        return losses
-
     def loss_edges(self, outputs, targets, idxs, num_instances, input_shape):
 
         src_idx, _, mix_tgt_idx = idxs
@@ -212,7 +160,6 @@ class Criterion(nn.Module):
             "masks": self.loss_masks,
             "edges": self.loss_edges,
             "obj": self.loss_obj,
-            "eprs": self.loss_eprs,
         }
 
         assert loss in loss_map
@@ -314,6 +261,6 @@ class Matcher(nn.Module):
             return indices
 
 
-def build_criterion(cfg, eprs_detector):
+def build_criterion(cfg):
     matcher = MATCHER_REGISTRY.get('Matcher')(cfg)
-    return CRITERION_REGISTRY.get('Criterion')(cfg, matcher, eprs_detector)
+    return CRITERION_REGISTRY.get('Criterion')(cfg, matcher)

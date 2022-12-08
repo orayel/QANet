@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import init
 
 from detectron2.utils.registry import Registry
 
@@ -15,35 +14,37 @@ class Question2Answer(nn.Module):
         super().__init__()
         self.scale_factor = cfg.MODEL.QANET.QA_BRANCH.SCALE_FACTOR
         self.N = cfg.MODEL.QANET.QA_BRANCH.NUM_MASKS
-        self.D = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM * 2  # make embeding dimension bigger
-        self.epr_expand = nn.Conv2d(self.N, self.N*self.D, 1)  # expand the dimension of epr
-        init.kaiming_normal_(self.epr_expand.weight, mode='fan_out', nonlinearity='relu')
-        init.constant_(self.epr_expand.bias, val=0.0)
 
-    def forward(self, lsf, mf, ef, of, eprf):
+    def forward(self, lsf, mf, ef, of, mf_auxs):
         """
-        location sensitive features: B N D
-        mask features:               B D H W
-        edge features:               B D H W
-        object features:             B D 1
-        error-prone region features: B D H W
+        location sensitive features:  B N D
+        mask features:                B D H W
+        edge features:                B D H W
+        object features:              B D 1
+        mask features auxiliarys:     [(B D H1 W1), (B D H2 W2)]
         """
         _, _, H, W = mf.shape
         pred_masks = torch.bmm(lsf, mf.flatten(2)).view(-1, self.N, H, W)
         pred_edges = torch.bmm(lsf, ef.flatten(2)).view(-1, self.N, H, W)
-        pred_eprs = torch.bmm(lsf, eprf.flatten(2)).view(-1, self.N, H, W)
-        pred_eprs = self.epr_expand(pred_eprs).view(-1, self.N, self.D, H, W)
+        pred_mask_auxs = []
+        for mf_aux in mf_auxs:
+            _, _, h, w = mf_aux.shape
+            pred_mask_aux = torch.bmm(lsf, mf_aux.flatten(2)).view(-1, self.N, h, w)
+            pred_mask_auxs.append(pred_mask_aux)
         pred_obj = torch.bmm(lsf, of)
 
         # large scale_factor to compute loss
         pred_masks = F.interpolate(pred_masks, scale_factor=self.scale_factor, mode='bilinear', align_corners=False)
         pred_edges = F.interpolate(pred_edges, scale_factor=self.scale_factor, mode='bilinear', align_corners=False)
+        for i in range(len(pred_mask_auxs)):
+            pred_mask_auxs[i] = \
+                F.interpolate(pred_mask_auxs[i], scale_factor=self.scale_factor, mode='bilinear', align_corners=False)
 
         output = {
             "pred_masks": pred_masks,
             "pred_edges": pred_edges,
-            "pred_eprs": pred_eprs,
             "pred_obj": pred_obj,
+            "pred_masks_aux": pred_mask_auxs,
         }
 
         return output

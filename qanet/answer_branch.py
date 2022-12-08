@@ -83,8 +83,8 @@ class ObjBranch(nn.Module):
         self.obj_proj = nn.Linear(dim, dim)
         self.epr_proj = nn.Conv2d(dim, dim, 1)
 
-        self.alpha, self.beta, self.gama, self.omega_mask, self.omega_edge = \
-            [nn.Parameter(data=torch.ones(2), requires_grad=True) for _ in range(5)]
+        self.alpha, self.beta, self.gama = \
+            [nn.Parameter(data=torch.ones(2), requires_grad=True) for _ in range(3)]
 
     def forward(self, mask_features, edge_features):
         mask_avg_f, mask_max_f = self.avg_pool(mask_features), self.max_pool(mask_features)
@@ -106,12 +106,31 @@ class AnswerBranch(nn.Module):
         super().__init__()
         channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
         in_channels = channels + 2 if cfg.MODEL.QANET.POSITION_EMBEDING.IS_USING else channels
+        num_convs = cfg.MODEL.QANET.QA_BRANCH.INIT_CONVS
+        num_auxs = len(cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES) - 1
 
-        self.init_conv = nn.Conv2d(in_channels, channels, 3)
-        self.mask_branch = MaskEdgeBranch(cfg, channels)
-        self.edge_branch = MaskEdgeBranch(cfg, channels)
-        self.obj_epr_branch = ObjEprBranch(cfg)
+        self.init_conv = self.init_convs(num_convs, in_channels, channels)
+        self.mask_branch = FeaturesDecoder(cfg, channels)
+        self.edge_branch = FeaturesDecoder(cfg, channels)
+        self.obj_branch = ObjBranch(cfg)
+
+        mask_aux_branchs = [nn.Sequential(
+            self.init_convs(num_convs, in_channels, channels),
+            FeaturesDecoder(cfg, channels)
+        ) for _ in range(num_auxs)]
+        self.mask_aux_branchs = nn.ModuleList(mask_aux_branchs)
+
         self.init_weights()
+
+    @staticmethod
+    def init_convs(num_convs, in_channels, out_channels):
+        convs = []
+        for _ in range(num_convs):
+            convs.append(
+                nn.Conv2d(in_channels, out_channels, 3, padding=1))
+            convs.append(nn.ReLU(True))
+            in_channels = out_channels
+        return nn.Sequential(*convs)
 
     def init_weights(self):
         for m in self.modules():
@@ -127,13 +146,18 @@ class AnswerBranch(nn.Module):
                 if m.bias is not None:
                     init.constant_(m.bias, val=0.0)
 
-    def forward(self, features):
+    def forward(self, features, features_aux):
         features = self.init_conv(features)
         mask_features = self.mask_branch(features)
         edge_features = self.edge_branch(features)
-        obj_features, epr_features = self.obj_epr_branch(mask_features, edge_features)
+        obj_features = self.obj_branch(mask_features, edge_features)
 
-        return mask_features, edge_features, obj_features, epr_features
+        mask_aux_features = []
+        for feature_aux, mask_aux_branch in zip(features_aux, self.mask_aux_branchs):
+            mask_aux_feature = mask_aux_branch(feature_aux)
+            mask_aux_features.append(mask_aux_feature)
+
+        return mask_features, edge_features, obj_features, mask_aux_features
 
 
 def build_answer_branch(cfg):

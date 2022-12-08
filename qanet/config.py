@@ -30,6 +30,7 @@ def add_qanet_config(cfg):
     cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM = 128
     cfg.MODEL.QANET.QA_BRANCH.NUM_MASKS = 100
     cfg.MODEL.QANET.QA_BRANCH.GROUPS = 4
+    cfg.MODEL.QANET.QA_BRANCH.INIT_CONVS = 3
     cfg.MODEL.QANET.QA_BRANCH.SCALE_FACTOR = 2
 
     # [Matcher]
@@ -40,14 +41,12 @@ def add_qanet_config(cfg):
 
     # [CRITERION]
     cfg.MODEL.CRITERION = CN()
-    cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj", "eprs")
-    # cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj")
+    cfg.MODEL.CRITERION.ITEMS = ("masks", "edges", "obj")
     cfg.MODEL.CRITERION.LOSS_MASKS_DICE_WEIGHT = 1.0
     cfg.MODEL.CRITERION.LOSS_MASKS_BCE_WEIGHT = 1.0
     cfg.MODEL.CRITERION.LOSS_EDGES_DICE_WEIGHT = 0.2
     cfg.MODEL.CRITERION.LOSS_EDGES_BCE_WEIGHT = 0.2
     cfg.MODEL.CRITERION.LOSS_OBJ_WEIGHT = 1.0
-    cfg.MODEL.CRITERION.LOSS_EPRS_WEIGHT = 1.0
 
     # [INFERENCE]
     cfg.MODEL.INFERENCE = CN()
