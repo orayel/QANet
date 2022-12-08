@@ -287,8 +287,10 @@ class Matcher(nn.Module):
                 while k:
                     indices_cur = [linear_sum_assignment(s[i], maximize=True)
                                    for i, s in enumerate(score.split(sizes, -1))]
-                    indices_cur = [linear_sum_assignment(s[i], maximize=True)
-                                   for i, s in enumerate(score.split(sizes, -1))]
+                    aaa = [s[i] for i, s in enumerate(score.split(sizes, -1))]
+                    for i, s in enumerate(score.split(sizes, -1)):
+                        for a, b in indices_cur[i]:
+                            aaa[i][a.tolist()][b.to(list)] = 0
                     for i in range(len(indices)):
                         indices[i] = (indices[i][0] + indices_cur[i][0].tolist(),
                                       indices[i][1] + indices_cur[i][1].tolist())
