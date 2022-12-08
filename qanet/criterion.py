@@ -31,6 +31,7 @@ class Criterion(nn.Module):
             "loss_edges_dice": cfg.MODEL.CRITERION.LOSS_EDGES_DICE_WEIGHT,
             "loss_edges_bce": cfg.MODEL.CRITERION.LOSS_EDGES_BCE_WEIGHT,
             "loss_obj": cfg.MODEL.CRITERION.LOSS_OBJ_WEIGHT,
+            "loss_masks_aux_dice": cfg.MODEL.CRITERION.LOSS_MASKS_AUX_DICE_WEIGHT,
         }
 
     @staticmethod
@@ -172,7 +173,7 @@ class Criterion(nn.Module):
             }
             return losses
 
-        loss_masks_aux_dice_total = src_masks_aux[0].sum() * 0.0
+        total_loss = src_masks_aux[0].sum() * 0.0
         for src_mask_aux in src_masks_aux:
             src_mask_aux_tmp = src_mask_aux[src_idx]
             target_mask_aux_tmp = F.interpolate(
@@ -180,10 +181,10 @@ class Criterion(nn.Module):
                 mode='bilinear', align_corners=False).squeeze(1)
             src_mask_aux_tmp = src_mask_aux_tmp.flatten(1)
             target_mask_aux_tmp = target_mask_aux_tmp[mix_tgt_idx].flatten(1)  # change order to abs position
-
+            total_loss += self.dice_loss(src_mask_aux_tmp, target_mask_aux_tmp, num_instances, reduction='mean')
 
         losses = {
-            "loss_masks_dice": self.dice_loss(src_masks, target_masks, num_instances, reduction='mean'),
+            "loss_masks_aux_dice": total_loss,
         }
         return losses
 

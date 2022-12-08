@@ -28,7 +28,7 @@ MODEL:
     DYNAMIC_K: True
     START_K: 10
   CRITERION:
-    ITEMS: ("masks", "edges", "obj")
+    ITEMS: ("masks", "edges", "obj", "masks_aux")
     LOSS_MASKS_DICE_WEIGHT: 1.0
     LOSS_MASKS_BCE_WEIGHT: 1.0
     LOSS_EDGES_DICE_WEIGHT: 0.2
