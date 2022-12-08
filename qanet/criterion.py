@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.cuda.amp import autocast
 import math
-import numpy as np
 from kornia.morphology import erosion
 from scipy.optimize import linear_sum_assignment
 
@@ -35,7 +34,7 @@ class Criterion(nn.Module):
         }
 
     @staticmethod
-    def get_src_tgt_idx(indices, num_masks):
+    def get_src_tgt_idx(indices, num_masks, k):
         """
         indices: (([75, 26], [0, 1]), ([12, 3, 45], [0, 2, 1]), ([55, 36], [0, 1]))
         num_masks: [2, 3, 2]
@@ -50,10 +49,11 @@ class Criterion(nn.Module):
 
         # if indices tgt do not in order, like [1, 0, 2], using this to change order
         mix_tgt_idx = torch.zeros_like(tgt_idx[1])
-        cum_sum = 0
-        for num_mask in num_masks:
-            mix_tgt_idx[cum_sum: cum_sum + num_mask] = cum_sum
-            cum_sum += num_mask
+        cum_sum, cum_idx = 0, 0
+        for num_mask in num_masks:  # cause each Gt match k-Samples !!
+            mix_tgt_idx[cum_sum: cum_sum + num_mask * k] = cum_idx
+            cum_sum += num_mask * k
+            cum_idx += num_mask
         mix_tgt_idx += tgt_idx[1]
 
         return src_idx, tgt_idx, mix_tgt_idx
@@ -75,6 +75,7 @@ class Criterion(nn.Module):
         masks_res = (masks - masks_recover).abs()
         masks_epr = F.interpolate(masks_res[:, None], (dh, dw), mode='bilinear', align_corners=False).squeeze(1)
         masks_epr[masks_epr >= 0.01] = 1.
+        masks_epr[masks_epr != 1] = 0.
 
         return masks_epr
 
@@ -169,7 +170,7 @@ class Criterion(nn.Module):
 
     def forward(self, outputs, targets, input_shape):
 
-        indices = self.matcher(outputs, targets, input_shape)
+        indices, k = self.matcher(outputs, targets, input_shape)
         num_masks = [len(t['masks']) for t in targets]
         num_instances = sum(len(t["labels"]) for t in targets)
         num_instances = torch.as_tensor(
@@ -179,7 +180,7 @@ class Criterion(nn.Module):
         num_instances = torch.clamp(num_instances / get_world_size(), min=1).item()
 
         losses = {}
-        idxs = self.get_src_tgt_idx(indices, num_masks)
+        idxs = self.get_src_tgt_idx(indices, num_masks, k)
         for loss in self.losses:
             losses.update(self.get_loss(loss, outputs, targets, idxs, num_instances, input_shape=input_shape))
 
@@ -282,30 +283,30 @@ class Matcher(nn.Module):
             sizes = [len(v["masks"]) for v in targets]
             if self.dynamic_k:  # do it dynamic-k times to make more positive sample in early time
 
-                k = max(1, math.ceil(self.start_k * (1 - self.cur_iter / self.total_iter)))
+                k = cnt = max(1, math.ceil(self.start_k * (1 - self.cur_iter / self.total_iter)))
                 indices = [([], [])] * B
-                while k:
+                while cnt:
                     indices_cur = [linear_sum_assignment(s[i], maximize=True)
                                    for i, s in enumerate(score.split(sizes, -1))]
-                    aaa = [s[i] for i, s in enumerate(score.split(sizes, -1))]
+                    # Update the score, make all the sample-a score to zero
                     for i, s in enumerate(score.split(sizes, -1)):
-                        for a, b in indices_cur[i]:
-                            aaa[i][a.tolist()][b.to(list)] = 0
+                        for a, _ in zip(*indices_cur[i]):
+                            s[i][a][:] = 0
                     for i in range(len(indices)):
                         indices[i] = (indices[i][0] + indices_cur[i][0].tolist(),
                                       indices[i][1] + indices_cur[i][1].tolist())
-                    k -= 1
+                    cnt -= 1
                 indices = [(torch.as_tensor(i, dtype=torch.int64),
                             torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
             else:
-
+                k = 1  # just do matcher once
                 indices = [linear_sum_assignment(s[i], maximize=True)
                            for i, s in enumerate(score.split(sizes, -1))]  # split to make each sample have owner GT
                 indices = [(torch.as_tensor(i, dtype=torch.int64),
                             torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
-            return indices
+            return indices, k
 
 
 def build_criterion(cfg):
