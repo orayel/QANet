@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.cuda.amp import autocast
+import math
+import numpy as np
 from kornia.morphology import erosion
 from scipy.optimize import linear_sum_assignment
 
@@ -198,20 +200,24 @@ class Matcher(nn.Module):
         lower value higher score (power)
         """
         self.alpha = cfg.MODEL.MATCHER.ALPHA
+        self.dynamic_k = cfg.MODEL.MATCHER.DYNAMIC_K
+        self.start_k = cfg.MODEL.MATCHER.START_K
+        self.total_iter = cfg.SOLVER.MAX_ITER
+        self.cur_iter = 0
 
     @staticmethod
     def dice_score(inputs, targets):
         numerator = 2 * torch.matmul(inputs, targets.t())
         denominator = (inputs * inputs).sum(-1)[:, None] + (targets * targets).sum(-1)
-        score = numerator / (denominator + 1e-4)
+        score = numerator / (denominator + 1e-6)
         return score
 
     @staticmethod
     def iou_score(inputs, targets):
         threshold = 0.5
         inputs, targets = (inputs >= threshold).float(), (targets >= threshold).float()
-        intersection = (inputs * targets).sum(-1)
-        union = targets.sum(-1) + inputs.sum(-1) - intersection
+        intersection = torch.matmul(inputs, targets.t())
+        union = targets.sum(-1)[None, :] + inputs.sum(-1)[:, None] - intersection
         score = intersection / (union + 1e-6)
         return score
 
@@ -227,6 +233,7 @@ class Matcher(nn.Module):
         return res
 
     def forward(self, outputs, targets, input_shape):
+        self.cur_iter += 1
         with torch.no_grad():
 
             pred_masks = outputs['pred_masks'].sigmoid()  # B N H W
@@ -250,8 +257,9 @@ class Matcher(nn.Module):
                     F.interpolate(tgt_masks[:, None], size=(h, w),
                                   mode="bilinear", align_corners=False).flatten(1).float())
             tgt_masks = F.interpolate(tgt_masks[:, None], size=(H, W),
-                                      mode="bilinear", align_corners=False).flatten(1).float()
+                                      mode="bilinear", align_corners=False)
             tgt_edges = self.get_edges(tgt_masks).flatten(1).float()
+            tgt_masks = tgt_masks.flatten(1).float()
 
             pred_masks, pred_edges, pred_obj = \
                 pred_masks.view(B * N, -1).float(), pred_edges.view(B * N, -1).float(), pred_obj.view(B * N, -1).float()
@@ -271,12 +279,30 @@ class Matcher(nn.Module):
 
             score = score.view(B, N, -1).cpu()  # B NUM_MASK NUM_GTs
             # hungarian matching
-            # TODO : do it dynamic-k times to make more positive sample?
             sizes = [len(v["masks"]) for v in targets]
-            indices = [linear_sum_assignment(s[i], maximize=True)
-                       for i, s in enumerate(score.split(sizes, -1))]  # split to make each sample have owner GT
-            indices = [(torch.as_tensor(i, dtype=torch.int64),
-                        torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
+            if self.dynamic_k:  # do it dynamic-k times to make more positive sample in early time
+
+                k = max(1, math.ceil(self.start_k * (1 - self.cur_iter / self.total_iter)))
+                indices = [([], [])] * B
+                while k:
+                    indices_cur = [linear_sum_assignment(s[i], maximize=True)
+                                   for i, s in enumerate(score.split(sizes, -1))]
+                    indices_cur = [linear_sum_assignment(s[i], maximize=True)
+                                   for i, s in enumerate(score.split(sizes, -1))]
+                    for i in range(len(indices)):
+                        indices[i] = (indices[i][0] + indices_cur[i][0].tolist(),
+                                      indices[i][1] + indices_cur[i][1].tolist())
+                    k -= 1
+                indices = [(torch.as_tensor(i, dtype=torch.int64),
+                            torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
+
+            else:
+
+                indices = [linear_sum_assignment(s[i], maximize=True)
+                           for i, s in enumerate(score.split(sizes, -1))]  # split to make each sample have owner GT
+                indices = [(torch.as_tensor(i, dtype=torch.int64),
+                            torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
+
             return indices
 
 

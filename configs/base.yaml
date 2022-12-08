@@ -40,7 +40,7 @@ DATASETS:
   TRAIN: ("cod10k_train",)
   TEST:  ("cod10k_test", "nc4k_test")
 SOLVER:
-  IMS_PER_BATCH: 1
+  IMS_PER_BATCH: 2
   OPTIMIZER: "ADAMW"
   BASE_LR: 0.00005
   BACKBONE_MULTIPLIER: 1.0
