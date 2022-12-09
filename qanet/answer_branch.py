@@ -109,13 +109,18 @@ class AnswerBranch(nn.Module):
         num_convs = cfg.MODEL.QANET.QA_BRANCH.INIT_CONVS
         num_auxs = len(cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES) - 1
 
-        self.init_conv = self.init_convs(num_convs, in_channels, channels)
+        # self.init_conv = self.init_convs(num_convs, in_channels, channels)
+        self.init_conv = nn.Conv2d(in_channels, channels, 3)
         self.mask_branch = FeaturesDecoder(cfg, channels)
         self.edge_branch = FeaturesDecoder(cfg, channels)
         self.obj_branch = ObjBranch(cfg)
 
+        # mask_aux_branchs = [nn.Sequential(
+        #     self.init_convs(num_convs, in_channels, channels),
+        #     FeaturesDecoder(cfg, channels)
+        # ) for _ in range(num_auxs)]
         mask_aux_branchs = [nn.Sequential(
-            self.init_convs(num_convs, in_channels, channels),
+            nn.Conv2d(in_channels, channels, 3),
             FeaturesDecoder(cfg, channels)
         ) for _ in range(num_auxs)]
         self.mask_aux_branchs = nn.ModuleList(mask_aux_branchs)
