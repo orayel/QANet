@@ -27,7 +27,7 @@ MODEL:
       SCALE_FACTOR: 2
   MATCHER:
     ALPHA: 0.6
-    DYNAMIC_K: False
+    DYNAMIC_K: True
     START_K: 10
   CRITERION:
     ITEMS: ("masks", "edges", "obj")
@@ -63,5 +63,5 @@ TEST:
 DATALOADER:
   NUM_WORKERS: 2
 VERSION: 2
-OUTPUT_DIR: '../output_r50_base'
+OUTPUT_DIR: '../output_r50_dk'
 #SEED: 30665215
