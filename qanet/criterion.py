@@ -270,7 +270,7 @@ class Matcher(nn.Module):
         with torch.no_grad():
 
             pred_masks = outputs['pred_masks'].sigmoid()  # B N H W
-            # pred_edges = outputs['pred_edges'].sigmoid()  # B N H W
+            pred_edges = outputs['pred_edges'].sigmoid()  # B N H W
             pred_obj = outputs['pred_obj'].sigmoid()  # B N 1
             # pred_masks_aux = []
             # for pred_mask_aux in outputs['pred_masks_aux']:
@@ -294,14 +294,15 @@ class Matcher(nn.Module):
             # tgt_edges = self.get_edges(tgt_masks).flatten(1).float()
             tgt_masks = tgt_masks.flatten(1).float()
 
-            # pred_masks, pred_edges, pred_obj = \
-            #     pred_masks.view(B * N, -1).float(), pred_edges.view(B * N, -1).float(), pred_obj.view(B * N, -1).float()
+            pred_masks, pred_edges, pred_obj = \
+                pred_masks.view(B * N, -1).float(), pred_edges.view(B * N, -1).float(), pred_obj.view(B * N, -1).float()
             # for i in range(len(pred_masks_aux)):
             #     pred_masks_aux[i] = pred_masks_aux[i].view(B * N, -1).float()
 
             with autocast(enabled=False):  # fp16
 
-                mask_score = self.combined_score(pred_masks, tgt_masks)
+                # mask_score = self.combined_score(pred_masks, tgt_masks)
+                mask_score = self.dice_score(pred_masks, tgt_masks)
                 # edge_score = self.combined_score(pred_edges, tgt_edges)
                 # mask_score_aux = sum([self.combined_score(pred_mask_aux, tgt_mask_aux) for
                 #                       pred_mask_aux, tgt_mask_aux in zip(pred_masks_aux, tgt_masks_aux)])
