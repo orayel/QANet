@@ -55,7 +55,7 @@ class CustomCommonMetricPrinter(CommonMetricPrinter):
                         if "loss" in k
                     ]
                 ),
-                k="dk: {:.1f}".format(storage.history("k").latest()),
+                k="dk: {:.1f}  ".format(storage.history("k").latest()),
                 time="time: {:.4f}  ".format(iter_time) if iter_time is not None else "",
                 data_time="data_time: {:.4f}  ".format(data_time) if data_time is not None else "",
                 lr=lr,

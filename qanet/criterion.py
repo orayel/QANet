@@ -7,6 +7,7 @@ from kornia.morphology import erosion
 from scipy.optimize import linear_sum_assignment
 
 from detectron2.utils.registry import Registry
+from detectron2.utils.events import get_event_storage
 from .utils import nested_masks_from_list, is_dist_avail_and_initialized, get_world_size
 
 MATCHER_REGISTRY = Registry("MATCHER")
@@ -340,6 +341,8 @@ class Matcher(nn.Module):
                 indices = [(torch.as_tensor(i, dtype=torch.int64),
                             torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
+            storage = get_event_storage()
+            storage.put_scalar("k", k)
             return indices, k
 
 

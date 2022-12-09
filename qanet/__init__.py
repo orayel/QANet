@@ -12,4 +12,4 @@ from .dataset_mapper import QANetInstDatasetMapper
 from .coco_evaluation import COCOMaskEvaluator
 from .backbones import build_resnet_vd_backbone, build_pvt_v2_b2_li, D2SwinTransformer
 from .d2_predictor import VisualizationDemo
-from utils import CustomWriter
+from .utils import CustomWriter
