@@ -214,8 +214,8 @@ class Criterion(nn.Module):
 
         losses = {}
         idxs = self.get_src_tgt_idx(indices, num_masks, k)
-        for loss in self.losses:
-            losses.update(self.get_loss(loss, outputs, targets, idxs, num_instances, input_shape=input_shape))
+        for loss in self.losses:  # num_instance should * k
+            losses.update(self.get_loss(loss, outputs, targets, idxs, num_instances * k, input_shape=input_shape))
 
         for k in losses.keys():
             if k in self.weight_dict:
