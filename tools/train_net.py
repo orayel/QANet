@@ -23,7 +23,7 @@ from detectron2.evaluation import (
 )
 
 sys.path.append(".")
-from qanet import add_qanet_config, COCOMaskEvaluator, register_dataset
+from qanet import add_qanet_config, COCOMaskEvaluator, register_dataset, CustomWriter
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -143,6 +143,9 @@ class Trainer(DefaultTrainer):
         else:
             mapper = None
         return build_detection_train_loader(cfg, mapper=mapper)
+
+    def build_writers(self):
+        return CustomWriter(self.cfg.OUTPUT_DIR, self.max_iter)
 
 
 def setup(args):

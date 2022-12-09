@@ -28,7 +28,7 @@ MODEL:
     DYNAMIC_K: True
     START_K: 10
   CRITERION:
-    ITEMS: ("masks", "edges", "obj", "masks_aux")
+    ITEMS: ("masks", "edges", "obj")
     LOSS_MASKS_DICE_WEIGHT: 1.0
     LOSS_MASKS_BCE_WEIGHT: 1.0
     LOSS_EDGES_DICE_WEIGHT: 0.2
@@ -52,7 +52,7 @@ SOLVER:
 INPUT:
   MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
   MIN_SIZE_TEST: 800
-  RANDOM_FLIP: "horizontal"
+  RANDOM_FLIP: "none"
   FORMAT: "RGB"
   MASK_FORMAT: "bitmask"
 TEST:
