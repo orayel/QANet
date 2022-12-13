@@ -82,16 +82,16 @@ class Criterion(nn.Module):
     @staticmethod
     def loss_objs(outputs, targets, idxs, num_instances, **kwargs):
         assert "pred_objs" in outputs
-        pred_objs = outputs['pred_objs'].flatten(1)
+        pred_objs = [pred_obj.flatten(1) for pred_obj in outputs['pred_objs']]
         tgt_obj = torch.zeros_like(pred_objs[0])
         tgt_obj[idxs[0]] = 1  # src_idx
 
         total_loss = None
         for pred_obj in pred_objs:
             if total_loss is None:
-                total_loss = F.binary_cross_entropy_with_logits(pred_obj, tgt_obj, reduction='mean')
+                total_loss = F.binary_cross_entropy(pred_obj.sigmoid(), tgt_obj, reduction='mean')
             else:
-                total_loss += F.binary_cross_entropy_with_logits(pred_obj, tgt_obj, reduction='mean')
+                total_loss += F.binary_cross_entropy(pred_obj.sigmoid(), tgt_obj, reduction='mean')
 
         losses = {'loss_objs': total_loss}
         return losses
@@ -145,7 +145,7 @@ class Criterion(nn.Module):
         num_masks = [len(t['masks']) for t in targets]
         num_instances = sum(len(t["labels"]) for t in targets)
         num_instances = torch.as_tensor(
-            [num_instances], dtype=torch.float, device=next(iter(outputs.values())).device)
+            [num_instances], dtype=torch.float, device=next(iter(outputs.values()))[0].device)
         if is_dist_avail_and_initialized():
             torch.distributed.all_reduce(num_instances)
         num_instances = torch.clamp(num_instances / get_world_size(), min=1).item()
