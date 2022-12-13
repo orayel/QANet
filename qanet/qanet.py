@@ -100,16 +100,12 @@ class QANet(nn.Module):
         max_shape = images.tensor.shape[2:]
 
         # forward
-        features = self.backbone(images.tensor)
-        features = self.fem(features)
-        features_aux = features[1:][::-1]  # 32↓  16↓  (remove 8↓)
-        features = self.fmm(features)
-        features, features_aux = self.pe(features, features_aux)
-        # location sensitive features
-        lsf = self.qb(features)
-        # mask features, edge features, object features, mask features auxiliary
-        mf, ef, of, mf_auxs = self.ab(features, features_aux)
-        output = self.q2a(lsf, mf, ef, of, mf_auxs)
+        fs = self.backbone(images.tensor)
+        fs = self.fem(fs)
+        f4q = self.fmm(fs)
+        fs, f4q = self.pe(fs, f4q)
+        (mfs, ofs), lsf = self.ab(fs), self.qb(f4q)  # mask features, object features, location sensitive features
+        output = self.q2a(lsf, mfs, ofs)
 
         if self.training:
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]

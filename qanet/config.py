@@ -67,15 +67,9 @@ def add_qanet_config(cfg):
     # [INPUT]
     cfg.INPUT.MIN_SIZE_TRAIN = (640, 672, 704, 736, 768, 800)
     cfg.INPUT.MIN_SIZE_TEST = 800
-    cfg.INPUT.RANDOM_FLIP = "horizontal"
+    cfg.INPUT.RANDOM_FLIP = "none"
     cfg.INPUT.FORMAT = "RGB"
     cfg.INPUT.MASK_FORMAT = "bitmask"
-
-    # [RESNET]
-    cfg.MODEL.RESNETS.DEPTH = 50
-    cfg.MODEL.RESNETS.OUT_FEATURES = ["res3", "res4", "res5"]
-    cfg.MODEL.RESNETS.NORM = 'BN'
-    cfg.MODEL.RESNETS.DEFORM_ON_PER_STAGE = [False, False, True, True]
 
     # [Pyramid Vision Transformer]
     cfg.MODEL.PVTV2 = CN()

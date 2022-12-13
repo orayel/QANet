@@ -26,7 +26,6 @@ class QuestionBranch(nn.Module):
         self.fc = nn.Linear(expand_dim, expand_dim)
         self.proj = nn.Linear(expand_dim, hidden_dim)
 
-        self.prior_prob = 0.01
         self.init_weights()
 
     def init_weights(self):

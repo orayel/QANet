@@ -36,21 +36,21 @@ class PositionEmbeding(nn.Module):
         locations = torch.cat([x_loc, y_loc], 1)
         return locations.to(x)
 
-    def forward(self, features, features_aux):
+    def forward(self, features, feature4question):
 
         if not self.is_pos_ebd:
-            return features, features_aux
+            return features, feature4question
 
-        coord_features = self.compute_coordinates(features)
-        features = torch.cat([coord_features, features], dim=1)  # B C+2 H W
+        coord_features = self.compute_coordinates(feature4question)
+        feature4question = torch.cat([coord_features, feature4question], dim=1)  # B C+2 H W
 
-        features_aux_out = []
-        for f in features_aux:
+        features_out = []
+        for f in features:
             coord_features = self.compute_coordinates(f)
             f = torch.cat([coord_features, f], dim=1)  # B C+2 H W
-            features_aux_out.append(f)
+            features_out.append(f)
 
-        return features, features_aux_out
+        return features_out, feature4question
 
 
 def build_position_embeding(cfg):
