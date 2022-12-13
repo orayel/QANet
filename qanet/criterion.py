@@ -133,7 +133,7 @@ class Criterion(nn.Module):
 
         loss_map = {
             "masks": self.loss_masks,
-            "obj": self.loss_objs,
+            "objs": self.loss_objs,
         }
 
         assert loss in loss_map
@@ -224,6 +224,7 @@ class Matcher(nn.Module):
                     mask_score = self.combined_score(pred_mask_, tgt_mask_)
                     obj_score = pred_obj_
 
+                    # TODO: change score formulation
                     if score is None:
                         score = (mask_score ** self.alpha) * (obj_score ** (1 - self.alpha))
                     else:
