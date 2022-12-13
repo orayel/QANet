@@ -24,9 +24,9 @@ MODEL:
       INIT_CONVS: 3
       SCALE_FACTOR: 2
   MATCHER:
-    ALPHA: 0.6
-    DYNAMIC_K: True
-    START_K: 10
+    ALPHA: 0.8
+    DYNAMIC_K: False
+    START_K: 5
   CRITERION:
     ITEMS: ("masks", "edges", "obj")
     LOSS_MASKS_DICE_WEIGHT: 1.0

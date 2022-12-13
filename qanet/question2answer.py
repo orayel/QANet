@@ -36,7 +36,7 @@ class Question2Answer(nn.Module):
 
         output = {
             "pred_masks": pred_masks,
-            "pred_obj": pred_objs,
+            "pred_objs": pred_objs,
         }
         return output
 
