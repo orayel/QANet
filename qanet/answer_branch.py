@@ -68,27 +68,31 @@ class MaskBranch(nn.Module):
 
         self.attention = SpatialAttention(channels)
         self.projection = nn.Conv2d(channels, hidden_dim, 1)
+        self.act = nn.ReLU(inplace=True)
 
     def forward(self, features):
-        return self.projection(self.attention(features))
+        return self.act(self.projection(self.attention(features)))
 
 
 class ObjBranch(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, channels):
         super().__init__()
-        dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
+        hidden_dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
 
+        self.proj = nn.Conv2d(channels, hidden_dim, 1)
+        self.act = nn.ReLU(inplace=True)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.max_pool = nn.AdaptiveMaxPool2d(1)
-        self.obj_proj = nn.Linear(dim, dim)
+        self.obj_proj = nn.Linear(hidden_dim, hidden_dim)
 
         self.alpha = nn.Parameter(data=torch.ones(2), requires_grad=True)
 
-    def forward(self, mask_features):
-        mask_avg_f, mask_max_f = self.avg_pool(mask_features), self.max_pool(mask_features)
+    def forward(self, features):
+        features = self.act(self.proj(features))
+        avg_f, max_f = self.avg_pool(features), self.max_pool(features)
 
         alpha_exp = torch.exp(self.alpha)
-        f = alpha_exp[0] / torch.sum(alpha_exp) * mask_avg_f + alpha_exp[1] / torch.sum(alpha_exp) * mask_max_f
+        f = alpha_exp[0] / torch.sum(alpha_exp) * avg_f + alpha_exp[1] / torch.sum(alpha_exp) * max_f
         f = self.obj_proj(f.squeeze(-1).permute(0, 2, 1)).permute(0, 2, 1)
         return f
 
@@ -102,7 +106,7 @@ class AnswerBranch(nn.Module):
 
         self.init_op = self.init_convs(num_convs, in_channels, channels)
         self.mask_branch = MaskBranch(cfg, channels)
-        self.obj_branch = ObjBranch(cfg)
+        self.obj_branch = ObjBranch(cfg, channels)
 
         self.init_weights()
 
@@ -134,7 +138,7 @@ class AnswerBranch(nn.Module):
 
         features = self.init_op(features)
         mask_features = self.mask_branch(features)
-        obj_features = self.obj_branch(mask_features)
+        obj_features = self.obj_branch(features)
 
         return mask_features, obj_features
 

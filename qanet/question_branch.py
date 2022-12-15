@@ -44,7 +44,7 @@ class QuestionBranch(nn.Module):
 
     def forward(self, features):
 
-        features = self.init_conv(features)  # B C H W
+        features = F.relu_(self.init_conv(features))  # B C H W
         iam = self.iam_conv(features)  # B G*N H W
         iam_prob = iam.sigmoid()
 

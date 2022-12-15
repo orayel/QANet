@@ -1,16 +1,18 @@
 MODEL:
   META_ARCHITECTURE: "QANet"
-  WEIGHTS: ""
+  WEIGHTS: "../pretrained_models/resnet50d_ra2-464e36ba.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   BACKBONE:
-    NAME: "build_resnet_backbone"
+    NAME: "build_resnet_vd_backbone"
+    FREEZE_AT: 0
   RESNETS:
     DEPTH: 50
     OUT_FEATURES: ["res3", "res4", "res5"]
+    DEFORM_ON_PER_STAGE: [False, False, True, True]
   QANET:
     FEATURES_ENHANCE:
-      RFENAME: "PPM"
+      RFENAME: "NORFE"
       IN_FEATURES: ["res3", "res4", "res5"]
       NUM_CHANNELS: 256
     FEATURES_MERGING:

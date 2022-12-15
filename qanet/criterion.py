@@ -87,7 +87,7 @@ class Criterion(nn.Module):
         tgt_obj = torch.zeros_like(pred_obj)
         tgt_obj[idxs[0]] = 1  # src_idx
 
-        losses = {'loss_obj': F.binary_cross_entropy(pred_obj.sigmoid(), tgt_obj, reduction='mean')}
+        losses = {'loss_obj': F.binary_cross_entropy_with_logits(pred_obj, tgt_obj, reduction='mean')}
         return losses
 
     def loss_mask(self, outputs, targets, idxs, num_instances, input_shape):
