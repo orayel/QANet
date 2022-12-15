@@ -140,8 +140,8 @@ class QANet(nn.Module):
     def inference(self, output, batched_inputs, max_shape, image_sizes):
         # TODO: using all levels, cur just using biggest level
         results = []
-        pred_obj = output["pred_objs"][0].sigmoid()
-        pred_mask = output["pred_masks"][0].sigmoid()
+        pred_obj = output["pred_obj"].sigmoid()
+        pred_mask = output["pred_mask"].sigmoid()
 
         for _, (obj_pred_per_image, mask_pred_per_image, batched_input, img_shape) in enumerate(zip(
                 pred_obj.flatten(1), pred_mask, batched_inputs, image_sizes)):
