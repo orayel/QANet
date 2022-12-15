@@ -26,7 +26,8 @@ class Criterion(nn.Module):
     @staticmethod
     def get_weight_dict(cfg):
         return {
-            "loss_mask": cfg.MODEL.CRITERION.LOSS_MASK_WEIGHT,
+            "loss_mask_dice": cfg.MODEL.CRITERION.LOSS_MASK_DICE_WEIGHT,
+            "loss_mask_bce": cfg.MODEL.CRITERION.LOSS_MASK_BCE_WEIGHT,
             "loss_obj": cfg.MODEL.CRITERION.LOSS_OBJ_WEIGHT,
         }
 
@@ -100,7 +101,8 @@ class Criterion(nn.Module):
         target_mask = target_mask.to(src_mask)
         if len(target_mask) == 0:
             losses = {
-                "loss_masks": src_mask.sum() * 0.0
+                "loss_mask_dice": src_mask.sum() * 0.0,
+                "loss_mask_bce": src_mask.sum() * 0.0
             }
             return losses
 
@@ -111,7 +113,8 @@ class Criterion(nn.Module):
         target_mask = target_mask[mix_tgt_idx].flatten(1)  # change order to abs position
 
         losses = {
-            "loss_mask": self.dice_loss(src_mask, target_mask, num_instances, reduction='mean'),
+            "loss_mask_dice": self.dice_loss(src_mask, target_mask, num_instances, reduction='mean'),
+            "loss_mask_bce": F.binary_cross_entropy_with_logits(src_mask, target_mask, reduction='mean'),
         }
         return losses
 
