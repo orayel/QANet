@@ -102,9 +102,10 @@ class QANet(nn.Module):
         # forward
         fs = self.backbone(images.tensor)
         fs = self.fem(fs)
-        f4q = self.fmm(fs)
-        fs, f4q = self.pe(fs, f4q)
-        (mfs, ofs), lsf = self.ab(fs), self.qb(f4q)  # mask features, object features, location sensitive features
+        fs = self.fmm(fs)
+        fs = self.pe(fs)
+        lsf = self.qb(fs)  # location sensitive features
+        mfs, ofs= self.ab(fs)  # mask features, object features
         output = self.q2a(lsf, mfs, ofs)
 
         if self.training:

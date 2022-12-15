@@ -18,25 +18,21 @@ class Question2Answer(nn.Module):
     def forward(self, lsf, mfs, ofs):
         """
         location sensitive features:  B N D
-        mask features:                [(B D H W), ...]
-        object features:              [(B D 1), ...]
+        mask features:                B D H W
+        object features:              B D 1
         """
-        pred_masks, pred_objs = [], []
-        for mf, of in zip(mfs, ofs):
-            _, _, H, W = mf.shape
-            pred_mask = torch.bmm(lsf, mf.flatten(2)).view(-1, self.N, H, W)
-            pred_obj = torch.bmm(lsf, of)
 
-            # large scale_factor to compute loss
-            pred_mask = F.interpolate(pred_mask, scale_factor=self.scale_factor,
-                                      mode='bilinear', align_corners=False)
+        _, _, H, W = mfs.shape
+        pred_mask = torch.bmm(lsf, mfs.flatten(2)).view(-1, self.N, H, W)
+        pred_obj = torch.bmm(lsf, ofs)
 
-            pred_masks.append(pred_mask)
-            pred_objs.append(pred_obj)
+        # large scale_factor to compute loss
+        pred_mask = F.interpolate(pred_mask, scale_factor=self.scale_factor,
+                                  mode='bilinear', align_corners=False)
 
         output = {
-            "pred_masks": pred_masks,
-            "pred_objs": pred_objs,
+            "pred_mask": pred_mask,
+            "pred_obj": pred_obj,
         }
         return output
 

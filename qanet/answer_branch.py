@@ -132,15 +132,11 @@ class AnswerBranch(nn.Module):
 
     def forward(self, features):
 
-        features_mask, features_obj = [], []
-        for feature in features:
-            feature = self.init_op(feature)
-            mask_feature = self.mask_branch(feature)
-            obj_feature = self.obj_branch(mask_feature)
-            features_mask.append(mask_feature)
-            features_obj.append(obj_feature)
+        features = self.init_op(features)
+        mask_features = self.mask_branch(features)
+        obj_features = self.obj_branch(mask_features)
 
-        return features_mask, features_obj
+        return mask_features, obj_features
 
 
 def build_answer_branch(cfg):
