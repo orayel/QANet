@@ -71,7 +71,7 @@ class Criterion(nn.Module):
 
     @staticmethod
     def dice_loss(inputs, targets, num_instance, reduction='mean'):
-        inputs = inputs.sigmoid()
+        # inputs = inputs.sigmoid()
         assert inputs.shape == targets.shape
         numerator = 2 * (inputs * targets).sum(1)
         denominator = (inputs * inputs).sum(-1) + (targets * targets).sum(-1)
@@ -88,7 +88,7 @@ class Criterion(nn.Module):
         tgt_obj = torch.zeros_like(pred_obj)
         tgt_obj[idxs[0]] = 1  # src_idx
 
-        losses = {'loss_obj': F.binary_cross_entropy_with_logits(pred_obj, tgt_obj, reduction='mean')}
+        losses = {'loss_obj': F.binary_cross_entropy(pred_obj.sigmoid(), tgt_obj, reduction='mean')}
         return losses
 
     def loss_mask(self, outputs, targets, idxs, num_instances, input_shape):
@@ -113,8 +113,8 @@ class Criterion(nn.Module):
         target_mask = target_mask[mix_tgt_idx].flatten(1)  # change order to abs position
 
         losses = {
-            "loss_mask_dice": self.dice_loss(src_mask, target_mask, num_instances, reduction='mean'),
-            "loss_mask_bce": F.binary_cross_entropy_with_logits(src_mask, target_mask, reduction='mean'),
+            "loss_mask_dice": self.dice_loss(src_mask.sigmoid(), target_mask, num_instances, reduction='mean'),
+            "loss_mask_bce": F.binary_cross_entropy(src_mask.sigmoid(), target_mask, reduction='mean'),
         }
         return losses
 
