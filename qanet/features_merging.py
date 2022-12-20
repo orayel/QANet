@@ -187,18 +187,11 @@ class FeaturesMergingModule(nn.Module):
                 init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:
                     init.constant_(m.bias, val=0.0)
-            elif isinstance(m, nn.BatchNorm2d):
-                init.constant_(m.weight, val=1.0)
-                init.constant_(m.bias, val=0.0)
-            elif isinstance(m, nn.Linear):
-                init.xavier_normal_(m.weight)
-                if m.bias is not None:
-                    init.constant_(m.bias, val=0.0)
 
     def forward(self, features):
         size = features[0].shape[2:]
         outputs = [features[0]] + [F.interpolate(x, size, mode='bilinear', align_corners=False) for x in features[1:]]
-        outputs = self.fusion(torch.cat(outputs, dim=1))
+        outputs = F.relu_(self.fusion(torch.cat(outputs, dim=1)))
         if self.is_using_ham:
             outputs = self.align(self.ham(outputs))
         return outputs

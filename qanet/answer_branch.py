@@ -8,6 +8,25 @@ ANSWER_BRANCH_REGISTRY = Registry("ANSWER_BRANCH")
 ANSWER_BRANCH_REGISTRY.__doc__ = "registry for answer branch"
 
 
+class Mlp(nn.Module):
+    def __init__(self, in_features, hidden_features=None, out_features=None):
+        super().__init__()
+
+        out_features = out_features or in_features
+        hidden_features = hidden_features or in_features
+        self.fc1 = nn.Conv2d(in_features, hidden_features, 1)
+        self.dwconv = nn.Conv2d(hidden_features, hidden_features, 3, 1, 1, bias=True, groups=hidden_features)
+        self.act = nn.GELU()
+        self.fc2 = nn.Conv2d(hidden_features, out_features, 1)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.dwconv(x)
+        x = self.act(x)
+        x = self.fc2(x)
+        return x
+
+
 class AttentionModule(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -42,7 +61,6 @@ class AttentionModule(nn.Module):
         return attn * u
 
 
-'''SegNeXt: Rethinking Convolutional Attention Design for Semantic Segmentation'''
 class SpatialAttention(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -61,71 +79,49 @@ class SpatialAttention(nn.Module):
         return x + shortcut
 
 
-class FeaturesDecoder(nn.Module):
-    def __init__(self, cfg, channels):
-        super().__init__()
-        hidden_dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
-
-        self.attention = SpatialAttention(channels)
-        self.projection = nn.Conv2d(channels, hidden_dim, 1)
-
-    def forward(self, features):
-        return self.projection(self.attention(features))
+'''SegNeXt: Rethinking Convolutional Attention Design for Semantic Segmentation'''
 
 
-class ObjBranch(nn.Module):
+class MSCABlock(nn.Module):
+
     def __init__(self, cfg):
         super().__init__()
         dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
+        ng = cfg.MODEL.QANET.QA_BRANCH.GNGROUPS
+        mlp_ratio = cfg.MODEL.QANET.QA_BRANCH.MLPRATIO
 
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.max_pool = nn.AdaptiveMaxPool2d(1)
-        self.obj_proj = nn.Linear(dim, dim)
-        self.epr_proj = nn.Conv2d(dim, dim, 1)
+        self.norm1 = nn.GroupNorm(num_groups=ng, num_channels=dim)
+        self.attn = SpatialAttention(dim)
+        self.norm2 = nn.GroupNorm(num_groups=ng, num_channels=dim)
+        mlp_hidden_dim = int(dim * mlp_ratio)
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim)
 
-        self.alpha, self.beta, self.gama = \
-            [nn.Parameter(data=torch.ones(2), requires_grad=True) for _ in range(3)]
+        layer_scale_init_value = 1e-2
+        self.layer_scale_1 = nn.Parameter(
+            layer_scale_init_value * torch.ones(dim), requires_grad=True)
+        self.layer_scale_2 = nn.Parameter(
+            layer_scale_init_value * torch.ones(dim), requires_grad=True)
 
-    def forward(self, mask_features, edge_features):
-        mask_avg_f, mask_max_f = self.avg_pool(mask_features), self.max_pool(mask_features)
-        edge_avg_f, edge_max_f = self.avg_pool(edge_features), self.max_pool(edge_features)
+    def forward(self, x):
+        x = x + self.layer_scale_1.unsqueeze(-1).unsqueeze(-1) * self.attn(self.norm1(x))
+        x = x + self.layer_scale_2.unsqueeze(-1).unsqueeze(-1) * self.mlp(self.norm2(x))
 
-        # object features
-        alpha_exp, beta_exp, gama_exp = torch.exp(self.alpha), torch.exp(self.beta), torch.exp(self.gama)
-        avg_f = alpha_exp[0] / torch.sum(alpha_exp) * mask_avg_f + alpha_exp[1] / torch.sum(alpha_exp) * edge_avg_f
-        max_f = beta_exp[0] / torch.sum(beta_exp) * mask_max_f + beta_exp[1] / torch.sum(beta_exp) * edge_max_f
-        obj_f = gama_exp[0] / torch.sum(gama_exp) * avg_f + gama_exp[1] / torch.sum(gama_exp) * max_f
-        obj_features = self.obj_proj(obj_f.squeeze(-1).permute(0, 2, 1)).permute(0, 2, 1)
-
-        return obj_features
+        return x
 
 
-@ANSWER_BRANCH_REGISTRY.register()
-class AnswerBranch(nn.Module):
+class FeatureExtraction(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
-        in_channels = channels + 2 if cfg.MODEL.QANET.POSITION_EMBEDING.IS_USING else channels
+        num_features = len(cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES)
+        dim = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
+        hidden_dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
+        num_blocks = cfg.MODEL.QANET.QA_BRANCH.MSCA_NUMS
         num_convs = cfg.MODEL.QANET.QA_BRANCH.INIT_CONVS
-        num_auxs = len(cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES) - 1
 
-        # self.init_conv = self.init_convs(num_convs, in_channels, channels)
-        self.init_conv = nn.Conv2d(in_channels, channels, 3)
-        self.mask_branch = FeaturesDecoder(cfg, channels)
-        self.edge_branch = FeaturesDecoder(cfg, channels)
-        self.obj_branch = ObjBranch(cfg)
-
-        # mask_aux_branchs = [nn.Sequential(
-        #     self.init_convs(num_convs, in_channels, channels),
-        #     FeaturesDecoder(cfg, channels)
-        # ) for _ in range(num_auxs)]
-        mask_aux_branchs = [nn.Sequential(
-            nn.Conv2d(in_channels, channels, 3),
-            FeaturesDecoder(cfg, channels)
-        ) for _ in range(num_auxs)]
-        self.mask_aux_branchs = nn.ModuleList(mask_aux_branchs)
-
-        self.init_weights()
+        self.featureExts = nn.ModuleList([nn.Sequential(
+            self.init_convs(num_convs, dim, hidden_dim),
+            *[MSCABlock(cfg) for _ in range(num_blocks)]
+        ) for _ in range(num_features)])
 
     @staticmethod
     def init_convs(num_convs, in_channels, out_channels):
@@ -137,32 +133,82 @@ class AnswerBranch(nn.Module):
             in_channels = out_channels
         return nn.Sequential(*convs)
 
+    def forward(self, features):
+        out_features = []
+        for feature, featureExt in zip(features, self.featureExts):
+            out_features.append(featureExt(feature))
+        return out_features
+
+
+class ObjBranch(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
+
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        self.obj_proj = nn.Linear(dim, dim)
+
+        self.alpha = nn.Parameter(data=torch.ones(2), requires_grad=True)
+
+    def forward(self, features):
+        avg_f, max_f = self.avg_pool(features), self.max_pool(features)
+
+        alpha_exp = torch.exp(self.alpha)
+        f = alpha_exp[0] / torch.sum(alpha_exp) * avg_f + alpha_exp[1] / torch.sum(alpha_exp) * max_f
+        obj_features = self.obj_proj(f.squeeze(-1).permute(0, 2, 1)).permute(0, 2, 1)
+
+        return obj_features
+
+
+@ANSWER_BRANCH_REGISTRY.register()
+class AnswerBranch(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        num_convs = cfg.MODEL.QANET.QA_BRANCH.MASK_CONVS
+        dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
+        self.num_features = len(cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES)
+
+        self.featuresExt = FeatureExtraction(cfg)
+        self.MaskBranch = self.mask_convs(num_convs, dim, dim)
+        self.ObjBranch = ObjBranch(cfg)
+
+        self.alpha = nn.Parameter(data=torch.ones(self.num_features), requires_grad=True)
+        self.init_weights()
+
+    @staticmethod
+    def mask_convs(num_convs, in_channels, out_channels):
+        convs = []
+        for _ in range(num_convs-1):
+            convs.append(nn.Conv2d(in_channels, out_channels, 3, padding=1))
+            convs.append(nn.ReLU(True))
+            in_channels = out_channels
+        convs.append(nn.Conv2d(in_channels, out_channels, 3, padding=1))
+        return nn.Sequential(*convs)
+
     def init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:
                     init.constant_(m.bias, val=0.0)
-            elif isinstance(m, nn.BatchNorm2d):
-                init.constant_(m.weight, val=1.0)
-                init.constant_(m.bias, val=0.0)
             elif isinstance(m, nn.Linear):
                 init.xavier_normal_(m.weight)
                 if m.bias is not None:
                     init.constant_(m.bias, val=0.0)
 
-    def forward(self, features, features_aux):
-        features = self.init_conv(features)
-        mask_features = self.mask_branch(features)
-        edge_features = self.edge_branch(features)
-        obj_features = self.obj_branch(mask_features, edge_features)
+    def forward(self, features):
 
-        mask_aux_features = []
-        for feature_aux, mask_aux_branch in zip(features_aux, self.mask_aux_branchs):
-            mask_aux_feature = mask_aux_branch(feature_aux)
-            mask_aux_features.append(mask_aux_feature)
+        features = self.featuresExt(features)
+        obj_features, mask_features = [], []
+        for feature in features:
+            obj_features.append(self.ObjBranch(feature))
+            mask_features.append(self.MaskBranch(feature))
 
-        return mask_features, edge_features, obj_features, mask_aux_features
+        alpha_exp = torch.exp(self.alpha)
+        obj_feature = sum([alpha_exp[i] / torch.sum(alpha_exp) * obj_features[i] for i in range(self.num_features)])
+
+        return mask_features, obj_feature
 
 
 def build_answer_branch(cfg):

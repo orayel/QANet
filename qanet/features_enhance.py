@@ -15,8 +15,8 @@ RF_ENHANCE_REGISTRY.__doc__ = "registry for receptive field enhance"
 class ASPPConv(nn.Sequential):
     def __init__(self, in_channels, out_channels, dilation):
         modules = [
-            nn.Conv2d(in_channels, out_channels, 3, padding=dilation, dilation=dilation, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.Conv2d(in_channels, out_channels, 3, padding=dilation, dilation=dilation),
+            # nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         ]
         super(ASPPConv, self).__init__(*modules)
@@ -26,8 +26,8 @@ class ASPPPooling(nn.Sequential):
     def __init__(self, in_channels, out_channels):
         super(ASPPPooling, self).__init__(
             nn.AdaptiveAvgPool2d(1),
-            nn.Conv2d(in_channels, out_channels, 1, bias=True),
-            nn.BatchNorm2d(out_channels),
+            nn.Conv2d(in_channels, out_channels, 1),
+            # nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True))
 
     def forward(self, x):
@@ -45,8 +45,8 @@ class ASPP(nn.Module):
             atrous_rates = [6, 12, 18]
 
         modules = [nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, 1, bias=False),
-            nn.BatchNorm2d(in_channels),
+            nn.Conv2d(in_channels, in_channels, 1),
+            # nn.BatchNorm2d(in_channels),
             nn.ReLU(inplace=True))]
 
         rate1, rate2, rate3 = tuple(atrous_rates)
@@ -57,8 +57,8 @@ class ASPP(nn.Module):
         self.convs = nn.ModuleList(modules)
 
         self.project = nn.Sequential(
-            nn.Conv2d(5 * in_channels, in_channels, 1, bias=False),
-            nn.BatchNorm2d(in_channels),
+            nn.Conv2d(5 * in_channels, in_channels, 1),
+            # nn.BatchNorm2d(in_channels),
             nn.ReLU(inplace=True),
             nn.Dropout(0.1),)
 
@@ -136,9 +136,6 @@ class FeaturesEnhanceModule(nn.Module):
                 init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:
                     init.constant_(m.bias, val=0.0)
-            elif isinstance(m, nn.BatchNorm2d):
-                init.constant_(m.weight, val=1.0)
-                init.constant_(m.bias, val=0.0)
             elif isinstance(m, nn.Linear):
                 init.xavier_normal_(m.weight)
                 if m.bias is not None:
@@ -149,13 +146,13 @@ class FeaturesEnhanceModule(nn.Module):
         features = [features[f] for f in self.in_features]
         features = features[::-1]
 
-        prev_features = self.rf(self.fpn_laterals[0](features[0]))
-        outputs = [self.fpn_outputs[0](prev_features)]
+        prev_features = self.rf(F.relu_(self.fpn_laterals[0](features[0])))
+        outputs = [F.relu_(self.fpn_outputs[0](prev_features))]
         for feature, lat_conv, output_conv in zip(features[1:], self.fpn_laterals[1:], self.fpn_outputs[1:]):
-            lat_features = lat_conv(feature)
+            lat_features = F.relu_(lat_conv(feature))
             top_down_features = F.interpolate(prev_features, scale_factor=2.0, mode='nearest')
             prev_features = lat_features + top_down_features
-            outputs.insert(0, output_conv(prev_features))
+            outputs.insert(0, F.relu_(output_conv(prev_features)))
 
         return outputs
 

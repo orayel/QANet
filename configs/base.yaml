@@ -4,10 +4,11 @@ MODEL:
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   BACKBONE:
-    NAME: "build_resnet_backbone"
+    NAME: "build_resnet_vd_backbone"
   RESNETS:
     DEPTH: 50
     OUT_FEATURES: ["res3", "res4", "res5"]
+    DEFORM_ON_PER_STAGE: [False, False, True, True]
   QANET:
     FEATURES_ENHANCE:
       RFENAME: "PPM"
@@ -15,8 +16,6 @@ MODEL:
       NUM_CHANNELS: 256
     FEATURES_MERGING:
       IS_USING_HAM: True
-    POSITION_EMBEDING:
-      IS_USING: True
     QA_BRANCH:
       HIDDEN_DIM: 128
       NUM_MASKS: 100
@@ -24,29 +23,22 @@ MODEL:
       INIT_CONVS: 3
       SCALE_FACTOR: 2
   MATCHER:
-    ALPHA: 0.6
+    ALPHA: 0.8
     DYNAMIC_K: True
-    START_K: 10
-  CRITERION:
-    ITEMS: ("masks", "edges", "obj")
-    LOSS_MASKS_DICE_WEIGHT: 1.0
-    LOSS_MASKS_BCE_WEIGHT: 1.0
-    LOSS_EDGES_DICE_WEIGHT: 0.2
-    LOSS_EDGES_BCE_WEIGHT: 0.2
-    LOSS_OBJ_WEIGHT: 1.0
+    START_K: 5
   INFERENCE:
     OBJ_THRESHOLD: 0.005
     MASK_THRESHOLD: 0.45
     MAX_DETECTIONS: 100
 DATASETS:
   TRAIN: ("cod10k_train",)
-  TEST:  ("cod10k_test", "nc4k_test")
+  TEST:  ("cod10k_test", )
 SOLVER:
-  IMS_PER_BATCH: 2
-  OPTIMIZER: "ADAMW"
-  BASE_LR: 0.00005
+  IMS_PER_BATCH: 1
+  OPTIMIZER: "SGD"
+  BASE_LR: 0.00025
   BACKBONE_MULTIPLIER: 1.0
-  STEPS: (40000, 60000, 80000)
+  STEPS: (60000, 80000)
   MAX_ITER: 90000
   WEIGHT_DECAY: 0.0001
 INPUT:
@@ -60,5 +52,5 @@ TEST:
 DATALOADER:
   NUM_WORKERS: 0
 VERSION: 2
-OUTPUT_DIR: '../output'
+OUTPUT_DIR: '../output_r50_base'
 #SEED: 30665215

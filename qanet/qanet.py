@@ -7,7 +7,6 @@ from detectron2.modeling import META_ARCH_REGISTRY, build_backbone
 
 from .features_enhance import build_features_enhance
 from .features_merging import build_features_merging
-from .position_embeding import build_position_embeding
 from .answer_branch import build_answer_branch
 from .question_branch import build_question_branch
 from .question2answer import build_question2answer
@@ -38,8 +37,6 @@ class QANet(nn.Module):
         self.fem = build_features_enhance(cfg, output_shape)
         # features merging module
         self.fmm = build_features_merging(cfg)
-        # position embeding
-        self.pe = build_position_embeding(cfg)
         # question branch
         self.qb = build_question_branch(cfg)
         # answer branch
@@ -100,16 +97,12 @@ class QANet(nn.Module):
         max_shape = images.tensor.shape[2:]
 
         # forward
-        features = self.backbone(images.tensor)
-        features = self.fem(features)
-        features_aux = features[1:][::-1]  # 32↓  16↓  (remove 8↓)
-        features = self.fmm(features)
-        features, features_aux = self.pe(features, features_aux)
-        # location sensitive features
-        lsf = self.qb(features)
-        # mask features, edge features, object features, mask features auxiliary
-        mf, ef, of, mf_auxs = self.ab(features, features_aux)
-        output = self.q2a(lsf, mf, ef, of, mf_auxs)
+        fs = self.backbone(images.tensor)
+        fs = self.fem(fs)
+        f4q = self.fmm(fs)
+        # location sensitive feature, mask features, object feature
+        lsf, (mfs, of) = self.qb(f4q), self.ab(fs)
+        output = self.q2a(lsf, mfs, of)
 
         if self.training:
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
@@ -144,10 +137,11 @@ class QANet(nn.Module):
 
         results = []
         pred_obj = output["pred_obj"].sigmoid()
+        # TODO
         pred_masks = output["pred_masks"].sigmoid()
 
         for _, (obj_pred_per_image, mask_pred_per_image, batched_input, img_shape) in enumerate(zip(
-                pred_obj.flatten(1), pred_masks, batched_inputs, image_sizes)):
+                pred_obj, pred_masks, batched_inputs, image_sizes)):
 
             ori_shape = (batched_input["height"], batched_input["width"])
             result = Instances(ori_shape)
