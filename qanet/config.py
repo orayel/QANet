@@ -13,13 +13,14 @@ def add_qanet_config(cfg):
 
     # [Features Enhance Module]
     cfg.MODEL.QANET.FEATURES_ENHANCE = CN()
-    cfg.MODEL.QANET.FEATURES_ENHANCE.RFENAME = "ASPP"
+    cfg.MODEL.QANET.FEATURES_ENHANCE.RFENAME = "PPM"
     cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES = ["res3", "res4", "res5"]
     cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS = 256
 
     # [Features Merging Module]
     cfg.MODEL.QANET.FEATURES_MERGING = CN()
     cfg.MODEL.QANET.FEATURES_MERGING.IS_USING_HAM = True
+    cfg.MODEL.QANET.FEATURES_MERGING.IS_USING_POS = True
 
     # [Question and Answer Branch]
     cfg.MODEL.QANET.QA_BRANCH = CN()
@@ -42,9 +43,9 @@ def add_qanet_config(cfg):
 
     # [CRITERION]
     cfg.MODEL.CRITERION = CN()
-    cfg.MODEL.CRITERION.ITEMS = ("masks", "obj")
-    cfg.MODEL.CRITERION.LOSS_MASKS_DICE_WEIGHT = 1.0
-    cfg.MODEL.CRITERION.LOSS_MASKS_BCE_WEIGHT = 1.0
+    cfg.MODEL.CRITERION.ITEMS = ("mask", "obj")
+    cfg.MODEL.CRITERION.LOSS_MASK_DICE_WEIGHT = 1.0
+    cfg.MODEL.CRITERION.LOSS_MASK_BCE_WEIGHT = 1.0
     cfg.MODEL.CRITERION.LOSS_OBJ_WEIGHT = 1.0
 
     # [INFERENCE]

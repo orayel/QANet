@@ -14,11 +14,13 @@ class QuestionBranch(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
+        in_channels = channels + 2 if cfg.MODEL.QANET.FEATURES_MERGING.IS_USING_POS else channels  # +2 position
         hidden_dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
+        init_convs_num = cfg.MODEL.QANET.QA_BRANCH.INIT_CONVS
         num_masks = cfg.MODEL.QANET.QA_BRANCH.NUM_MASKS
         self.num_groups = cfg.MODEL.QANET.QA_BRANCH.GROUPS
 
-        self.init_conv = nn.Conv2d(channels+2, channels, 3)  # +2 position information
+        self.init_conv = self.init_convs(init_convs_num, in_channels, channels)
         expand_dim = channels * self.num_groups
         self.iam_conv = nn.Conv2d(
             channels, num_masks*self.num_groups, 3, padding=1, groups=self.num_groups)
@@ -26,6 +28,16 @@ class QuestionBranch(nn.Module):
         self.proj = nn.Linear(expand_dim, hidden_dim)
 
         self.init_weights()
+
+    @staticmethod
+    def init_convs(num_convs, in_channels, out_channels):
+        convs = []
+        for _ in range(num_convs):
+            convs.append(
+                nn.Conv2d(in_channels, out_channels, 3, padding=1))
+            convs.append(nn.ReLU(True))
+            in_channels = out_channels
+        return nn.Sequential(*convs)
 
     def init_weights(self):
         for m in self.modules():
@@ -38,24 +50,9 @@ class QuestionBranch(nn.Module):
                 if m.bias is not None:
                     init.constant_(m.bias, val=0.0)
 
-    @torch.no_grad()
-    def compute_coordinates(self, x):
-        h, w = x.size(2), x.size(3)
-        y_loc = -1.0 + 2.0 * torch.arange(h, device=x.device) / (h - 1)
-        x_loc = -1.0 + 2.0 * torch.arange(w, device=x.device) / (w - 1)
-        y_loc, x_loc = torch.meshgrid(y_loc, x_loc)
-        y_loc = y_loc.expand([x.shape[0], 1, -1, -1])
-        x_loc = x_loc.expand([x.shape[0], 1, -1, -1])
-        locations = torch.cat([x_loc, y_loc], 1)
-        return locations.to(x)
-
     def forward(self, features):
 
-        # position embedding
-        coord_features = self.compute_coordinates(features)
-        features = torch.cat([coord_features, features], dim=1)  # B C+2 H W
-
-        features = F.relu_(self.init_conv(features))  # B C H W
+        features = self.init_conv(features)  # B C H W
         iam = self.iam_conv(features)  # B G*N H W
         iam_prob = iam.sigmoid()  # activation, so do not use relu
 

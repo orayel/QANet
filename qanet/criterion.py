@@ -27,8 +27,8 @@ class Criterion(nn.Module):
     @staticmethod
     def get_weight_dict(cfg):
         return {
-            "loss_masks_dice": cfg.MODEL.CRITERION.LOSS_MASKS_DICE_WEIGHT,
-            "loss_masks_bce": cfg.MODEL.CRITERION.LOSS_MASKS_BCE_WEIGHT,
+            "loss_mask_dice": cfg.MODEL.CRITERION.LOSS_MASK_DICE_WEIGHT,
+            "loss_mask_bce": cfg.MODEL.CRITERION.LOSS_MASK_BCE_WEIGHT,
             "loss_obj": cfg.MODEL.CRITERION.LOSS_OBJ_WEIGHT,
         }
 
@@ -86,47 +86,42 @@ class Criterion(nn.Module):
         assert "pred_obj" in outputs
         pred_obj = outputs['pred_obj'].sigmoid()
         tgt_obj = torch.zeros_like(pred_obj)
+        # TODO: using label smoothing to avoid over-fit?
         tgt_obj[idxs[0]] = 1  # src_idx
 
         losses = {'loss_obj': F.binary_cross_entropy(pred_obj, tgt_obj, reduction='mean')}
         return losses
 
-    def loss_masks(self, outputs, targets, idxs, num_instances, input_shape):
+    def loss_mask(self, outputs, targets, idxs, num_instances, input_shape):
 
         src_idx, _, mix_tgt_idx = idxs
-        assert "pred_masks" in outputs
-        src_masks = [pred_mask.sigmoid() for pred_mask in outputs["pred_masks"]]
+        assert "pred_mask" in outputs
+        src_masks = outputs["pred_mask"].sigmoid()
         with torch.no_grad():
             target_masks, _ = nested_masks_from_list([t["masks"].tensor for t in targets], input_shape).decompose()
         target_masks = target_masks.to(src_masks[0])
+        target_masks = F.interpolate(target_masks[:, None], size=src_masks.shape[-2:],
+                                     mode='bilinear', align_corners=False).squeeze(1)
         if len(target_masks) == 0:
             losses = {
-                "loss_masks_dice": src_masks[0].sum() * 0.0,
-                "loss_masks_bce": src_masks[0].sum() * 0.0,
+                "loss_mask_dice": src_masks[0].sum() * 0.0,
+                "loss_mask_bce": src_masks[0].sum() * 0.0,
             }
             return losses
 
-        total_dice_loss, total_bce_loss = src_masks[0].sum() * 0.0, src_masks[0].sum() * 0.0
-        for src_mask in src_masks:
-            src_mask = src_mask[src_idx]
-            target_mask = F.interpolate(target_masks[:, None], size=src_mask.shape[-2:],
-                                        mode='bilinear', align_corners=False).squeeze(1)
-            src_mask = src_mask.flatten(1)
-            target_mask = target_mask[mix_tgt_idx].flatten(1)  # change order to abs position
-            total_dice_loss += self.dice_loss(src_mask, target_mask, num_instances, reduction='mean')
-            total_bce_loss += F.binary_cross_entropy(src_mask, target_mask, reduction='mean')
+        src_mask = src_masks[src_idx].flatten(1)
+        target_mask = target_masks[mix_tgt_idx].flatten(1)  # change order to abs position and adapt to dk
 
-        # TODO: each loss split out by using f"{i}"
         losses = {
-            "loss_masks_dice": total_dice_loss,
-            "loss_masks_bce": total_bce_loss,
+            "loss_mask_dice": self.dice_loss(src_mask, target_mask, num_instances, reduction='mean'),
+            "loss_mask_bce": F.binary_cross_entropy(src_mask, target_mask, reduction='mean'),
         }
         return losses
 
     def get_loss(self, loss, outputs, targets, indices, num_instances, **kwargs):
 
         loss_map = {
-            "masks": self.loss_masks,
+            "mask": self.loss_mask,
             "obj": self.loss_obj,
         }
 
@@ -139,7 +134,7 @@ class Criterion(nn.Module):
         num_masks = [len(t['masks']) for t in targets]
         num_instances = sum(len(t["labels"]) for t in targets)
         num_instances = torch.as_tensor(
-            [num_instances], dtype=torch.float, device=next(iter(outputs.values()))[0].device)
+            [num_instances], dtype=torch.float, device=next(iter(outputs.values())).device)
         if is_dist_avail_and_initialized():
             torch.distributed.all_reduce(num_instances)
         num_instances = torch.clamp(num_instances / get_world_size(), min=1).item()
@@ -205,26 +200,24 @@ class Matcher(nn.Module):
         self.cur_iter += 1
         with torch.no_grad():
             pred_obj = outputs['pred_obj'].sigmoid()  # B N
-            pred_masks = [pred_mask.sigmoid() for pred_mask in outputs['pred_masks']]  # B C Hi Wi
-            B, N = pred_obj.shape
+            pred_mask = outputs['pred_mask'].sigmoid()  # B C H W
+            B, N, H, W = pred_mask.shape
 
             tgt_ids = torch.cat([v["labels"] for v in targets])
             if tgt_ids.shape[0] == 0:
-                return [(torch.as_tensor([]).to(pred_masks[0]), torch.as_tensor([]).to(pred_masks[0]))] * B
+                return [(torch.as_tensor([]).to(pred_mask), torch.as_tensor([]).to(pred_mask))] * B
 
             tgt_mask, _ = nested_masks_from_list([t["masks"].tensor for t in targets], input_shape).decompose()
-            tgt_mask = tgt_mask.to(pred_masks[0])  # BitMask to float
-            tgt_masks = [F.interpolate(tgt_mask[:, None], size=(pred_mask.shape[2], pred_mask.shape[3]),
-                                       mode="bilinear", align_corners=False).flatten(1).float()
-                         for pred_mask in pred_masks]
+            tgt_mask = tgt_mask.to(pred_mask)  # BitMask to float
+            tgt_mask = F.interpolate(tgt_mask[:, None], size=(H, W),
+                                     mode="bilinear", align_corners=False).flatten(1).float()
 
-            pred_masks = [pred_mask.view(B * N, -1).float() for pred_mask in pred_masks]
+            pred_mask = pred_mask.view(B * N, -1).float()
             pred_obj = pred_obj.view(B * N, -1).float()
 
             with autocast(enabled=False):  # fp16
 
-                mask_score = sum([self.score(pred_mask, tgt_mask) for
-                                 pred_mask, tgt_mask in zip(pred_masks, tgt_masks)]) / len(pred_masks)
+                mask_score = self.score(pred_mask, tgt_mask)
                 obj_score = pred_obj
 
                 # finally score for matching

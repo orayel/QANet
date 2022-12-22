@@ -16,6 +16,7 @@ MODEL:
       NUM_CHANNELS: 256
     FEATURES_MERGING:
       IS_USING_HAM: True
+      IS_USING_POS: True
     QA_BRANCH:
       HIDDEN_DIM: 128
       NUM_MASKS: 100

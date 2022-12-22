@@ -99,10 +99,10 @@ class QANet(nn.Module):
         # forward
         fs = self.backbone(images.tensor)
         fs = self.fem(fs)
-        f4q = self.fmm(fs)
-        # location sensitive feature, mask features, object feature
-        lsf, (mfs, of) = self.qb(f4q), self.ab(fs)
-        output = self.q2a(lsf, mfs, of)
+        fs = self.fmm(fs)
+        # location sensitive features, mask features, object features
+        lsf, (mf, of) = self.qb(fs), self.ab(fs)
+        output = self.q2a(lsf, mf, of)
 
         if self.training:
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
@@ -137,8 +137,7 @@ class QANet(nn.Module):
 
         results = []
         pred_obj = output["pred_obj"].sigmoid()
-        # TODO
-        pred_masks = output["pred_masks"].sigmoid()
+        pred_masks = output["pred_mask"].sigmoid()
 
         for _, (obj_pred_per_image, mask_pred_per_image, batched_input, img_shape) in enumerate(zip(
                 pred_obj, pred_masks, batched_inputs, image_sizes)):

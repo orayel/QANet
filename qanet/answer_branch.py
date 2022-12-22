@@ -86,7 +86,7 @@ class MSCABlock(nn.Module):
 
     def __init__(self, cfg):
         super().__init__()
-        dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
+        dim = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
         ng = cfg.MODEL.QANET.QA_BRANCH.GNGROUPS
         mlp_ratio = cfg.MODEL.QANET.QA_BRANCH.MLPRATIO
 
@@ -109,45 +109,15 @@ class MSCABlock(nn.Module):
         return x
 
 
-class FeatureExtraction(nn.Module):
-    def __init__(self, cfg):
-        super().__init__()
-        num_features = len(cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES)
-        dim = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
-        hidden_dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
-        num_blocks = cfg.MODEL.QANET.QA_BRANCH.MSCA_NUMS
-        num_convs = cfg.MODEL.QANET.QA_BRANCH.INIT_CONVS
-
-        self.featureExts = nn.ModuleList([nn.Sequential(
-            self.init_convs(num_convs, dim, hidden_dim),
-            *[MSCABlock(cfg) for _ in range(num_blocks)]
-        ) for _ in range(num_features)])
-
-    @staticmethod
-    def init_convs(num_convs, in_channels, out_channels):
-        convs = []
-        for _ in range(num_convs):
-            convs.append(
-                nn.Conv2d(in_channels, out_channels, 3, padding=1))
-            convs.append(nn.ReLU(True))
-            in_channels = out_channels
-        return nn.Sequential(*convs)
-
-    def forward(self, features):
-        out_features = []
-        for feature, featureExt in zip(features, self.featureExts):
-            out_features.append(featureExt(feature))
-        return out_features
-
-
 class ObjBranch(nn.Module):
     def __init__(self, cfg):
         super().__init__()
+        in_dim = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
         dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
 
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.max_pool = nn.AdaptiveMaxPool2d(1)
-        self.obj_proj = nn.Linear(dim, dim)
+        self.obj_proj = nn.Linear(in_dim, dim)
 
         self.alpha = nn.Parameter(data=torch.ones(2), requires_grad=True)
 
@@ -165,16 +135,29 @@ class ObjBranch(nn.Module):
 class AnswerBranch(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        num_convs = cfg.MODEL.QANET.QA_BRANCH.MASK_CONVS
+        channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
+        in_channels = channels + 2 if cfg.MODEL.QANET.FEATURES_MERGING.IS_USING_POS else channels  # +2 position
+        init_convs_num = cfg.MODEL.QANET.QA_BRANCH.INIT_CONVS
+        mask_convs_num = cfg.MODEL.QANET.QA_BRANCH.MASK_CONVS
+        num_blocks = cfg.MODEL.QANET.QA_BRANCH.MSCA_NUMS
         dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
-        self.num_features = len(cfg.MODEL.QANET.FEATURES_ENHANCE.IN_FEATURES)
 
-        self.featuresExt = FeatureExtraction(cfg)
-        self.MaskBranch = self.mask_convs(num_convs, dim, dim)
+        self.init_conv = self.init_convs(init_convs_num, in_channels, channels)
+        self.FeaturesExt = nn.Sequential(*[MSCABlock(cfg) for _ in range(num_blocks)])
+        self.MaskBranch = self.mask_convs(mask_convs_num, channels, dim)
         self.ObjBranch = ObjBranch(cfg)
 
-        self.alpha = nn.Parameter(data=torch.ones(self.num_features), requires_grad=True)
         self.init_weights()
+
+    @staticmethod
+    def init_convs(num_convs, in_channels, out_channels):
+        convs = []
+        for _ in range(num_convs):
+            convs.append(
+                nn.Conv2d(in_channels, out_channels, 3, padding=1))
+            convs.append(nn.ReLU(True))
+            in_channels = out_channels
+        return nn.Sequential(*convs)
 
     @staticmethod
     def mask_convs(num_convs, in_channels, out_channels):
@@ -199,16 +182,11 @@ class AnswerBranch(nn.Module):
 
     def forward(self, features):
 
-        features = self.featuresExt(features)
-        obj_features, mask_features = [], []
-        for feature in features:
-            obj_features.append(self.ObjBranch(feature))
-            mask_features.append(self.MaskBranch(feature))
+        features = self.init_conv(features)
+        features = self.FeaturesExt(features)
+        mask_features, obj_features = self.MaskBranch(features), self.ObjBranch(features)
 
-        alpha_exp = torch.exp(self.alpha)
-        obj_feature = sum([alpha_exp[i] / torch.sum(alpha_exp) * obj_features[i] for i in range(self.num_features)])
-
-        return mask_features, obj_feature
+        return mask_features, obj_features
 
 
 def build_answer_branch(cfg):

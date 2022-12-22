@@ -16,11 +16,16 @@ MODEL:
       NUM_CHANNELS: 256
     FEATURES_MERGING:
       IS_USING_HAM: True
+      IS_USING_POS: True
     QA_BRANCH:
       HIDDEN_DIM: 128
+      GNGROUPS: 32
+      MLPRATIO: 4
+      MSCA_NUMS: 3
+      INIT_CONVS: 3
+      MASK_CONVS: 3
       NUM_MASKS: 100
       GROUPS: 4
-      INIT_CONVS: 3
       SCALE_FACTOR: 2
   MATCHER:
     ALPHA: 0.8

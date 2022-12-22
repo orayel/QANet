@@ -170,6 +170,7 @@ class FeaturesMergingModule(nn.Module):
         super().__init__()
         self.num_channels = cfg.MODEL.QANET.FEATURES_ENHANCE.NUM_CHANNELS
         self.is_using_ham = cfg.MODEL.QANET.FEATURES_MERGING.IS_USING_HAM
+        self.is_using_pos = cfg.MODEL.QANET.FEATURES_MERGING.IS_USING_POS
 
         self.fusion = nn.Conv2d(self.num_channels * 3, self.num_channels, 1)
 
@@ -188,12 +189,28 @@ class FeaturesMergingModule(nn.Module):
                 if m.bias is not None:
                     init.constant_(m.bias, val=0.0)
 
+    @torch.no_grad()
+    def compute_coordinates(self, x):
+        h, w = x.size(2), x.size(3)
+        y_loc = -1.0 + 2.0 * torch.arange(h, device=x.device) / (h - 1)
+        x_loc = -1.0 + 2.0 * torch.arange(w, device=x.device) / (w - 1)
+        y_loc, x_loc = torch.meshgrid(y_loc, x_loc)
+        y_loc = y_loc.expand([x.shape[0], 1, -1, -1])
+        x_loc = x_loc.expand([x.shape[0], 1, -1, -1])
+        locations = torch.cat([x_loc, y_loc], 1)
+        return locations.to(x)
+
     def forward(self, features):
+
         size = features[0].shape[2:]
         outputs = [features[0]] + [F.interpolate(x, size, mode='bilinear', align_corners=False) for x in features[1:]]
         outputs = F.relu_(self.fusion(torch.cat(outputs, dim=1)))
+
         if self.is_using_ham:
             outputs = self.align(self.ham(outputs))
+        if self.is_using_pos:
+            coord_features = self.compute_coordinates(outputs)
+            outputs = torch.cat([coord_features, outputs], dim=1)  # B C+2 H W
         return outputs
 
 

@@ -15,22 +15,20 @@ class Question2Answer(nn.Module):
         self.scale_factor = cfg.MODEL.QANET.QA_BRANCH.SCALE_FACTOR
         self.N = cfg.MODEL.QANET.QA_BRANCH.NUM_MASKS
 
-    def forward(self, lsf, mfs, of):
+    def forward(self, lsf, mf, of):
         """
         location sensitive features:  B N D
-        mask features:                [(B D H1 W1), (B D H2 W2) ...]
+        mask features:                B D H W
         object feature:               B D 1
         """
-        pred_masks = []
-        for mf in mfs:
-            _, _, h, w = mf.shape
-            pred_mask = torch.bmm(lsf, mf.flatten(2)).view(-1, self.N, h, w)
-            pred_mask = F.interpolate(pred_mask, scale_factor=self.scale_factor, mode='bilinear', align_corners=False)
-            pred_masks.append(pred_mask)
+
+        _, _, H, W = mf.shape
+        pred_mask = torch.bmm(lsf, mf.flatten(2)).view(-1, self.N, H, W)
+        pred_mask = F.interpolate(pred_mask, scale_factor=self.scale_factor, mode='bilinear', align_corners=False)
         pred_obj = torch.bmm(lsf, of)
 
         output = {
-            "pred_masks": pred_masks,
+            "pred_mask": pred_mask,
             "pred_obj": pred_obj.flatten(1),
         }
 
