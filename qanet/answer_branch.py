@@ -142,31 +142,21 @@ class AnswerBranch(nn.Module):
         num_blocks = cfg.MODEL.QANET.QA_BRANCH.MSCA_NUMS
         dim = cfg.MODEL.QANET.QA_BRANCH.HIDDEN_DIM
 
-        self.init_conv = self.init_convs(init_convs_num, in_channels, channels)
+        self.init_conv = self.make_convs(init_convs_num, in_channels, channels)
         self.FeaturesExt = nn.Sequential(*[MSCABlock(cfg) for _ in range(num_blocks)])
-        self.MaskBranch = self.mask_convs(mask_convs_num, channels, dim)
+        self.MaskBranch = self.make_convs(mask_convs_num, channels, dim)
         self.ObjBranch = ObjBranch(cfg)
 
         self.init_weights()
 
     @staticmethod
-    def init_convs(num_convs, in_channels, out_channels):
+    def make_convs(num_convs, in_channels, out_channels):
         convs = []
         for _ in range(num_convs):
             convs.append(
                 nn.Conv2d(in_channels, out_channels, 3, padding=1))
             convs.append(nn.ReLU(True))
             in_channels = out_channels
-        return nn.Sequential(*convs)
-
-    @staticmethod
-    def mask_convs(num_convs, in_channels, out_channels):
-        convs = []
-        for _ in range(num_convs-1):
-            convs.append(nn.Conv2d(in_channels, out_channels, 3, padding=1))
-            convs.append(nn.ReLU(True))
-            in_channels = out_channels
-        convs.append(nn.Conv2d(in_channels, out_channels, 3, padding=1))
         return nn.Sequential(*convs)
 
     def init_weights(self):
